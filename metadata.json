@@ -1,0 +1,5 @@
+{
+  "name": "Culinary Vision",
+  "description": "An AI-powered culinary assistant that turns a photo of your ingredients into recipe ideas and generates short-form cooking videos.",
+  "requestFramePermissions": []
+}
