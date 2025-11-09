@@ -5,6 +5,7 @@ import { LoadingSpinner } from './components/LoadingSpinner';
 import { CookingAgent } from './components/CookingAgent';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { generateCulinaryPlan, generateAllRecipeVideos } from './services/geminiService';
+import { generateRecipeVoiceover } from './services/elevenLabsService';
 import type { CulinaryPlan, AgentContext, Storyboard } from './types';
 import { ChefHatIcon, ErrorIcon } from './components/Icons';
 
@@ -94,24 +95,46 @@ export default function App(): React.ReactElement {
           const hook = hooks[index % hooks.length];
           const mainIngredient = plan.ingredients[0] || 'ingredients';
           
+          // Create more specific voiceover script mentioning the dish name and details
+          const stepsPreview = recipe.steps.slice(0, 2).join(', then ');
           placeholderStoryboards[index] = {
             hook: hook,
-            voiceover_script: `Today we're making ${recipe.title}. This ${recipe.difficulty} recipe takes just ${recipe.time_minutes} minutes and uses simple ingredients you already have. Let's get cooking!`,
+            voiceover_script: `Let's make ${recipe.title}! This ${recipe.difficulty} ${recipe.time_minutes}-minute recipe is so easy. ${stepsPreview}. Ready in just ${recipe.time_minutes} minutes - let's cook!`,
             video_description: `A fast-paced cooking video showing the preparation of ${recipe.title}. The video starts with a close-up of fresh ${mainIngredient}, then shows quick cuts of mixing, cooking, and plating. On-screen text displays the recipe name and key steps. The video has a vibrant, energetic feel perfect for social media.`,
             caption: recipe.title
           };
         });
+        
+        // Generate voiceovers for all recipes (even in test mode for better experience)
+        setVideoProgress('🎤 Generating voiceovers...');
+        const recipeVoiceovers: { [recipeIndex: number]: string } = {};
+        
+        for (let i = 0; i < plan.recipes.length; i++) {
+          try {
+            const storyboard = placeholderStoryboards[i];
+            if (storyboard?.voiceover_script) {
+              setVideoProgress(`🎤 Generating voiceover for: ${plan.recipes[i].title}`);
+              const voiceoverUrl = await generateRecipeVoiceover(storyboard.voiceover_script);
+              recipeVoiceovers[i] = voiceoverUrl;
+              console.log(`Voiceover generated for recipe ${i}: ${plan.recipes[i].title}`);
+            }
+          } catch (error) {
+            console.warn(`Failed to generate voiceover for recipe ${i}:`, error);
+            // Continue without voiceover for this recipe
+          }
+        }
         
         // Use empty video arrays (will show beautiful gradient backgrounds)
         const updatedPlan: CulinaryPlan = {
           ...plan,
           videoUrls: [],
           recipeVideos: {},
-          recipeStoryboards: placeholderStoryboards
+          recipeStoryboards: placeholderStoryboards,
+          recipeVoiceovers: recipeVoiceovers
         };
         setCulinaryPlan(updatedPlan);
         setAppState(AppState.DISPLAYING_RECIPES);
-        console.log('🧪 Test Mode: Recipes ready with placeholder storyboards');
+        console.log('🧪 Test Mode: Recipes ready with placeholder storyboards and voiceovers');
         return;
       }
       
@@ -134,10 +157,29 @@ export default function App(): React.ReactElement {
         
         if (quotaExceeded) {
           console.warn('Video generation quota was exceeded. Recipes are available without videos.');
-          setVideoProgress('⚠️ Video quota exceeded. Showing recipes without videos.');
+          setVideoProgress('⚠️ Video quota exceeded. Generating voiceovers...');
         } else {
-          // Clear progress message when done
-          setVideoProgress('');
+          setVideoProgress('🎤 Generating voiceovers for recipes...');
+        }
+        
+        // Generate voiceovers for all recipes (even if videos failed)
+        const recipeVoiceovers: { [recipeIndex: number]: string } = {};
+        
+        for (let i = 0; i < plan.recipes.length; i++) {
+          try {
+            // Use generated storyboard if available, otherwise use original
+            const storyboard = recipeStoryboards[i] || (i === 0 ? plan.storyboard : undefined);
+            
+            if (storyboard?.voiceover_script) {
+              onProgress(`🎤 Generating voiceover: ${plan.recipes[i].title}`, i + 1, plan.recipes.length);
+              const voiceoverUrl = await generateRecipeVoiceover(storyboard.voiceover_script);
+              recipeVoiceovers[i] = voiceoverUrl;
+              console.log(`Voiceover generated for recipe ${i}: ${plan.recipes[i].title}`);
+            }
+          } catch (error) {
+            console.warn(`Failed to generate voiceover for recipe ${i}:`, error);
+            // Continue without voiceover for this recipe
+          }
         }
         
         // Keep legacy videoUrls and storyboard for first recipe for backward compatibility
@@ -146,10 +188,17 @@ export default function App(): React.ReactElement {
           ...plan, 
           videoUrls: Array.isArray(recipeVideos[0]) ? recipeVideos[0] : [],
           recipeVideos: recipeVideos || {},
-          recipeStoryboards: recipeStoryboards || {}
+          recipeStoryboards: recipeStoryboards || {},
+          recipeVoiceovers: recipeVoiceovers
         };
         setCulinaryPlan(updatedPlan);
-        console.log('Updated plan with recipeVideos and recipeStoryboards:', updatedPlan.recipeVideos);
+        console.log('Updated plan with recipeVideos, recipeStoryboards, and recipeVoiceovers:', updatedPlan.recipeVideos);
+        
+        if (quotaExceeded) {
+          setVideoProgress('⚠️ Videos unavailable, but voiceovers are ready!');
+        } else {
+          setVideoProgress('');
+        }
       } catch (videoError: any) {
         // Video generation failed (quota, API issues, etc.) but we continue anyway
         console.warn('Video generation failed, continuing without videos:', videoError);
@@ -169,14 +218,33 @@ export default function App(): React.ReactElement {
           setVideoProgress('');
         }
         
+        // Generate voiceovers even if video generation failed
+        setVideoProgress('🎤 Generating voiceovers...');
+        const recipeVoiceovers: { [recipeIndex: number]: string } = {};
+        
+        for (let i = 0; i < plan.recipes.length; i++) {
+          try {
+            const storyboard = i === 0 ? plan.storyboard : undefined;
+            if (storyboard?.voiceover_script) {
+              setVideoProgress(`🎤 Generating voiceover: ${plan.recipes[i].title}`);
+              const voiceoverUrl = await generateRecipeVoiceover(storyboard.voiceover_script);
+              recipeVoiceovers[i] = voiceoverUrl;
+            }
+          } catch (error) {
+            console.warn(`Failed to generate voiceover for recipe ${i}:`, error);
+          }
+        }
+        
         // Continue with recipes without videos - will show gradient background
         const updatedPlan: CulinaryPlan = { 
           ...plan, 
           videoUrls: [],
           recipeVideos: {},
-          recipeStoryboards: {}
+          recipeStoryboards: {},
+          recipeVoiceovers: recipeVoiceovers
         };
         setCulinaryPlan(updatedPlan);
+        setVideoProgress(isQuotaError ? '⚠️ Videos unavailable, but voiceovers are ready!' : '');
       } finally {
         // Always transition to displaying recipes, even if video generation failed
         setAppState(AppState.DISPLAYING_RECIPES);

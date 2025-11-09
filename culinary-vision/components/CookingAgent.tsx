@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { chatWithCookingAgent, type AgentContext } from '../services/cookingAgent';
+import { generateChefVoice } from '../services/elevenLabsService';
 import type { AgentMessage, ShoppingList, MealPlan, Substitution } from '../types';
-import { ChefHatIcon, XIcon, SendIcon, SparklesIcon } from './Icons';
+import { ChefHatIcon, XIcon, SendIcon, SparklesIcon, VolumeIcon, VolumeOffIcon, PlayIcon, PauseIcon } from './Icons';
 
 interface CookingAgentProps {
   context: AgentContext;
@@ -19,6 +20,10 @@ export const CookingAgent: React.FC<CookingAgentProps> = ({ context, onClose }) 
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [toolResults, setToolResults] = useState<any[]>([]);
+  const [isVoiceEnabled, setIsVoiceEnabled] = useState(true);
+  const [isVoicePlaying, setIsVoicePlaying] = useState(false);
+  const [currentVoiceUrl, setCurrentVoiceUrl] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -40,12 +45,13 @@ export const CookingAgent: React.FC<CookingAgentProps> = ({ context, onClose }) 
     };
 
     setMessages(prev => [...prev, userMessage]);
+    const userInput = input.trim();
     setInput('');
     setIsLoading(true);
 
     try {
       const response = await chatWithCookingAgent(
-        userMessage.content,
+        userInput,
         context,
         messages
       );
@@ -61,6 +67,46 @@ export const CookingAgent: React.FC<CookingAgentProps> = ({ context, onClose }) 
       if (response.toolResults && response.toolResults.length > 0) {
         setToolResults(prev => [...prev, ...response.toolResults!]);
       }
+
+      // Generate and play chef voice for assistant response
+      if (isVoiceEnabled && response.response) {
+        try {
+          // Clean the response text (remove markdown, emojis for better speech)
+          const cleanText = response.response
+            .replace(/\*\*/g, '') // Remove bold
+            .replace(/\*/g, '') // Remove italic
+            .replace(/`/g, '') // Remove code blocks
+            .replace(/#{1,6}\s/g, '') // Remove headers
+            .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1') // Remove markdown links
+            .replace(/\n{2,}/g, '. ') // Replace multiple newlines with periods
+            .replace(/\n/g, '. ') // Replace single newlines
+            .trim();
+
+          if (cleanText.length > 0) {
+            const voiceUrl = await generateChefVoice(cleanText);
+            setCurrentVoiceUrl(voiceUrl);
+            
+            // Play the voice
+            if (audioRef.current) {
+              // Clean up previous audio
+              if (audioRef.current.src) {
+                URL.revokeObjectURL(audioRef.current.src);
+              }
+              
+              audioRef.current.src = voiceUrl;
+              audioRef.current.volume = 0.8;
+              audioRef.current.play().then(() => {
+                setIsVoicePlaying(true);
+              }).catch(e => {
+                console.log('Auto-play prevented for chef voice:', e);
+              });
+            }
+          }
+        } catch (voiceError) {
+          console.warn('Failed to generate chef voice:', voiceError);
+          // Continue without voice - not critical
+        }
+      }
     } catch (error) {
       const errorMessage: AgentMessage = {
         role: 'assistant',
@@ -70,6 +116,52 @@ export const CookingAgent: React.FC<CookingAgentProps> = ({ context, onClose }) 
       setMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Handle audio playback events
+  useEffect(() => {
+    const audioElement = audioRef.current;
+    if (!audioElement) return;
+
+    const handlePlay = () => setIsVoicePlaying(true);
+    const handlePause = () => setIsVoicePlaying(false);
+    const handleEnded = () => {
+      setIsVoicePlaying(false);
+      // Clean up audio URL when done
+      if (audioElement.src) {
+        URL.revokeObjectURL(audioElement.src);
+        setCurrentVoiceUrl(null);
+      }
+    };
+
+    audioElement.addEventListener('play', handlePlay);
+    audioElement.addEventListener('pause', handlePause);
+    audioElement.addEventListener('ended', handleEnded);
+
+    return () => {
+      audioElement.removeEventListener('play', handlePlay);
+      audioElement.removeEventListener('pause', handlePause);
+      audioElement.removeEventListener('ended', handleEnded);
+    };
+  }, []);
+
+  const toggleVoice = () => {
+    if (audioRef.current && currentVoiceUrl) {
+      if (isVoicePlaying) {
+        audioRef.current.pause();
+      } else {
+        audioRef.current.play().catch(e => console.error('Play failed:', e));
+      }
+    }
+  };
+
+  const toggleVoiceEnabled = () => {
+    setIsVoiceEnabled(!isVoiceEnabled);
+    // Stop current playback if disabling
+    if (!isVoiceEnabled && audioRef.current) {
+      audioRef.current.pause();
+      setIsVoicePlaying(false);
     }
   };
 
@@ -190,13 +282,51 @@ export const CookingAgent: React.FC<CookingAgentProps> = ({ context, onClose }) 
               <p className="text-xs text-gray-400">Powered by Google Gemini</p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
-          >
-            <XIcon className="w-5 h-5 text-gray-400" />
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Voice controls */}
+            <button
+              onClick={toggleVoiceEnabled}
+              className={`p-2 rounded-lg transition-colors ${
+                isVoiceEnabled 
+                  ? 'bg-indigo-700 hover:bg-indigo-600 text-white' 
+                  : 'bg-gray-800 hover:bg-gray-700 text-gray-400'
+              }`}
+              title={isVoiceEnabled ? "Disable chef voice" : "Enable chef voice"}
+            >
+              {isVoiceEnabled ? (
+                <VolumeIcon className="w-5 h-5" />
+              ) : (
+                <VolumeOffIcon className="w-5 h-5" />
+              )}
+            </button>
+            {currentVoiceUrl && isVoiceEnabled && (
+              <button
+                onClick={toggleVoice}
+                className="p-2 bg-indigo-700 hover:bg-indigo-600 rounded-lg transition-colors"
+                title={isVoicePlaying ? "Pause voice" : "Play voice"}
+              >
+                {isVoicePlaying ? (
+                  <PauseIcon className="w-5 h-5 text-white" />
+                ) : (
+                  <PlayIcon className="w-5 h-5 text-white" />
+                )}
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
+            >
+              <XIcon className="w-5 h-5 text-gray-400" />
+            </button>
+          </div>
         </div>
+        
+        {/* Hidden audio element for chef voice */}
+        <audio
+          ref={audioRef}
+          preload="auto"
+          className="hidden"
+        />
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">

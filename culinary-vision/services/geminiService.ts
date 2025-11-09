@@ -134,13 +134,23 @@ const generateRecipeStoryboard = async (recipe: Recipe, apiKey: string): Promise
   
   const prompt = `Generate a 10-second vertical video storyboard for this recipe: "${recipe.title}"
 
-Recipe steps: ${recipe.steps.join(', ')}
+Recipe details:
+- Time: ${recipe.time_minutes} minutes
+- Difficulty: ${recipe.difficulty}
+- Steps: ${recipe.steps.join('. ')}
+
+Create an engaging, specific voiceover that:
+1. Mentions the dish name "${recipe.title}" clearly
+2. Highlights the time (${recipe.time_minutes} minutes) and difficulty
+3. Describes 2-3 key steps from the recipe
+4. Uses a casual, energetic tone like TikTok/Instagram Reels
+5. Is exactly 8-12 seconds when spoken (aim for 25-35 words)
 
 Provide:
-- "hook": "One-sentence attention grabber, fun, casual"
-- "voiceover_script": "Natural narration for 10-second video, ~30-40 words, casual like TikTok"
+- "hook": "One-sentence attention grabber mentioning the dish name, fun, casual"
+- "voiceover_script": "Specific narration mentioning "${recipe.title}" by name, the ${recipe.time_minutes}-minute time, and key cooking steps. Should be 25-35 words, casual and energetic, perfect for a short cooking video."
 - "video_description": "Detailed description of the cooking video covering the key visual steps and actions that will happen in 10 seconds. Include transitions between steps."
-- "caption": "Main on-screen text/caption that will appear during the video (keep it short and punchy)"
+- "caption": "Main on-screen text/caption - the dish name "${recipe.title}" (keep it short and punchy)"
 
 Return JSON with these fields.`;
 

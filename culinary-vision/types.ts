@@ -20,6 +20,7 @@ export interface CulinaryPlan {
   videoUrls?: string[]; // Legacy: videos for first recipe
   recipeVideos?: { [recipeIndex: number]: string[] }; // New: videos per recipe
   recipeStoryboards?: { [recipeIndex: number]: Storyboard }; // New: storyboards per recipe
+  recipeVoiceovers?: { [recipeIndex: number]: string }; // New: voiceover audio URLs per recipe
 }
 
 // Agent-related types
