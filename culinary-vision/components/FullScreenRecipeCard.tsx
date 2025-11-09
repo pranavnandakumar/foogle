@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { Recipe, Storyboard, CulinaryPlan } from '../types';
-import { ChefHatIcon, ClockIcon, BarChartIcon, ListIcon, XIcon, SparklesIcon, VolumeIcon, VolumeOffIcon, PlayIcon, PauseIcon } from './Icons';
+import { ChefHatIcon, ClockIcon, BarChartIcon, ListIcon, XIcon, SparklesIcon, VolumeIcon, VolumeOffIcon, PlayIcon, PauseIcon, HeartIcon, HeartFilledIcon } from './Icons';
+import { favoritesService } from '../services/favoritesService';
+import { authService } from '../services/authService';
 
 interface FullScreenRecipeCardProps {
   recipe: Recipe;
@@ -11,6 +13,7 @@ interface FullScreenRecipeCardProps {
   culinaryPlan?: CulinaryPlan;
   isVisible?: boolean;
   recipeIndex?: number;
+  onFavoriteChange?: () => void;
 }
 
 export const FullScreenRecipeCard: React.FC<FullScreenRecipeCardProps> = ({ 
@@ -21,13 +24,24 @@ export const FullScreenRecipeCard: React.FC<FullScreenRecipeCardProps> = ({
   onOpenAgent, 
   culinaryPlan,
   isVisible = false,
-  recipeIndex = 0
+  recipeIndex = 0,
+  onFavoriteChange
 }) => {
   const [isDetailsVisible, setIsDetailsVisible] = useState(false);
   const [isVoiceoverPlaying, setIsVoiceoverPlaying] = useState(false);
   const [isVoiceoverMuted, setIsVoiceoverMuted] = useState(false);
+  const [isFavorited, setIsFavorited] = useState(false);
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
+
+  // Check if recipe is favorited
+  useEffect(() => {
+    if (culinaryPlan?.ingredients) {
+      const favorited = favoritesService.isFavorite(recipe.title, culinaryPlan.ingredients);
+      setIsFavorited(favorited);
+    }
+  }, [recipe.title, culinaryPlan?.ingredients]);
 
   // If no videos available, show a beautiful gradient background instead
   const hasVideo = videoUrls.length > 0;
@@ -403,6 +417,45 @@ export const FullScreenRecipeCard: React.FC<FullScreenRecipeCardProps> = ({
             </button>
           </div>
         )}
+        {/* Favorite button */}
+        <button
+          onClick={() => {
+            if (!authService.isAuthenticated()) {
+              setShowLoginPrompt(true);
+              return;
+            }
+
+            if (culinaryPlan?.ingredients) {
+              if (isFavorited) {
+                favoritesService.removeFavorite(recipe.title, culinaryPlan.ingredients);
+                setIsFavorited(false);
+              } else {
+                const voiceoverUrl = culinaryPlan?.recipeVoiceovers?.[recipeIndex];
+                favoritesService.addFavorite(
+                  recipe,
+                  culinaryPlan.ingredients,
+                  storyboard,
+                  videoUrls,
+                  voiceoverUrl
+                );
+                setIsFavorited(true);
+              }
+              onFavoriteChange?.();
+            }
+          }}
+          className={`p-2 rounded-full transition-all duration-200 ${
+            isFavorited
+              ? 'bg-red-500/90 hover:bg-red-600 text-white'
+              : 'bg-black/50 hover:bg-black/70 text-white'
+          }`}
+          title={isFavorited ? "Remove from favorites" : "Add to favorites"}
+        >
+          {isFavorited ? (
+            <HeartFilledIcon className="w-5 h-5" />
+          ) : (
+            <HeartIcon className="w-5 h-5" />
+          )}
+        </button>
         <button
           onClick={onReset}
           className="bg-black/50 hover:bg-indigo-600 text-white font-bold p-2 rounded-full transition-colors duration-300"
@@ -411,6 +464,37 @@ export const FullScreenRecipeCard: React.FC<FullScreenRecipeCardProps> = ({
           <ChefHatIcon className="w-6 h-6"/>
         </button>
       </header>
+      
+      {/* Login prompt */}
+      {showLoginPrompt && (
+        <div className="absolute inset-0 bg-black/80 backdrop-blur-sm z-30 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-2xl max-w-md w-full p-6 text-center">
+            <HeartIcon className="w-12 h-12 text-red-500 mx-auto mb-4" />
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Sign In to Save Favorites</h3>
+            <p className="text-gray-600 mb-6">
+              Create an account or sign in to save your favorite recipes and access them anytime.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowLoginPrompt(false)}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setShowLoginPrompt(false);
+                  // Trigger login modal from parent
+                  window.dispatchEvent(new CustomEvent('openLoginModal'));
+                }}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Sign In
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* Hidden audio element for voiceover */}
       {hasVoiceover && (

@@ -90,7 +90,7 @@ Given the uploaded image, identify only edible ingredients. Ignore containers, b
 Return ingredients as a JSON array of lowercase singular ingredient names.
 
 ### STEP 2 — RECIPE OPTIONS
-Using only these ingredients plus basic pantry staples (salt, pepper, oil, water), propose 5 recipe ideas.
+Using only these ingredients plus basic pantry staples (salt, pepper, oil, water), propose 3 recipe ideas.
 For each recipe, provide:
 - title (fun & catchy, <= 6 words)
 - time_minutes (<= 25)

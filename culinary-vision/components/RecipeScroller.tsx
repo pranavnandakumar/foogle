@@ -6,6 +6,7 @@ interface RecipeScrollerProps {
   plan: CulinaryPlan;
   onReset: () => void;
   onOpenAgent?: () => void;
+  onFavoriteChange?: () => void;
 }
 
 // Placeholder videos to use for the UI layout while generation is disabled.
@@ -21,7 +22,7 @@ const PLACEHOLDER_VIDEOS = [
 ];
 
 
-export const RecipeScroller: React.FC<RecipeScrollerProps> = ({ plan, onReset, onOpenAgent }) => {
+export const RecipeScroller: React.FC<RecipeScrollerProps> = ({ plan, onReset, onOpenAgent, onFavoriteChange }) => {
   const [visibleRecipeIndex, setVisibleRecipeIndex] = useState<number>(0);
   const recipeRefs = useRef<(HTMLDivElement | null)[]>([]);
   const scrollerRef = useRef<HTMLDivElement>(null);
@@ -184,6 +185,7 @@ export const RecipeScroller: React.FC<RecipeScrollerProps> = ({ plan, onReset, o
               culinaryPlan={plan}
               isVisible={isVisible}
               recipeIndex={index}
+              onFavoriteChange={onFavoriteChange}
             />
           </div>
         );

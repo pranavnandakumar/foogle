@@ -4,16 +4,21 @@ import { RecipeScroller } from './components/RecipeScroller';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { CookingAgent } from './components/CookingAgent';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { LoginModal } from './components/LoginModal';
+import { FavoritesView } from './components/FavoritesView';
 import { generateCulinaryPlan, generateAllRecipeVideos } from './services/geminiService';
 import { generateRecipeVoiceover } from './services/elevenLabsService';
+import { authService } from './services/authService';
+import { favoritesService } from './services/favoritesService';
 import type { CulinaryPlan, AgentContext, Storyboard } from './types';
-import { ChefHatIcon, ErrorIcon } from './components/Icons';
+import { ChefHatIcon, ErrorIcon, HeartFilledIcon, UserIcon, LogoutIcon, HomeIcon } from './components/Icons';
 
 enum AppState {
   UPLOADING,
   GENERATING,
   GENERATING_VIDEOS,
   DISPLAYING_RECIPES,
+  FAVORITES,
   ERROR,
 }
 
@@ -27,7 +32,56 @@ export default function App(): React.ReactElement {
   const [totalRecipes, setTotalRecipes] = useState<number>(0);
   const [currentTip, setCurrentTip] = useState<string>('');
   const [isAgentOpen, setIsAgentOpen] = useState(false);
+  const [user, setUser] = useState<any>(null);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [favoriteCount, setFavoriteCount] = useState<number>(0);
+  const [favoritesCulinaryPlan, setFavoritesCulinaryPlan] = useState<CulinaryPlan | null>(null);
   const tipIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Check authentication and load user on mount
+  useEffect(() => {
+    const currentUser = authService.getCurrentUser();
+    setUser(currentUser);
+    if (currentUser) {
+      setFavoriteCount(favoritesService.getFavoriteCount());
+    }
+  }, []);
+
+  // Listen for login modal open event
+  useEffect(() => {
+    const handleOpenLogin = () => {
+      setIsLoginModalOpen(true);
+    };
+    window.addEventListener('openLoginModal', handleOpenLogin);
+    return () => {
+      window.removeEventListener('openLoginModal', handleOpenLogin);
+    };
+  }, []);
+
+  // Handle user login
+  const handleLogin = useCallback((loggedInUser: any) => {
+    setUser(loggedInUser);
+    setFavoriteCount(favoritesService.getFavoriteCount());
+    setIsLoginModalOpen(false);
+  }, []);
+
+  // Handle user logout
+  const handleLogout = useCallback(() => {
+    authService.signOut();
+    setUser(null);
+    setFavoriteCount(0);
+    // If on favorites page, go back to upload
+    if (appState === AppState.FAVORITES) {
+      setAppState(AppState.UPLOADING);
+    }
+  }, [appState]);
+
+  // Handle favorite change
+  const handleFavoriteChange = useCallback(() => {
+    if (user) {
+      setFavoriteCount(favoritesService.getFavoriteCount());
+    }
+  }, [user]);
 
   // Rotating cooking tips
   const cookingTips = [
@@ -275,10 +329,100 @@ export default function App(): React.ReactElement {
     setTotalRecipes(0);
   }, []);
 
+  const handleShowFavorites = useCallback(() => {
+    if (!user) {
+      setIsLoginModalOpen(true);
+      return;
+    }
+    setAppState(AppState.FAVORITES);
+  }, [user]);
+
+  const handleBackToHome = useCallback(() => {
+    setAppState(AppState.UPLOADING);
+  }, []);
+
   const renderContent = () => {
     switch (appState) {
       case AppState.UPLOADING:
-        return <ImageUploader onImageUpload={handleImageUpload} onTestMode={handleTestMode} />;
+        return (
+          <div className="relative">
+            {/* Navigation header */}
+            <div className="absolute top-4 left-4 right-4 z-10 flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <ChefHatIcon className="w-8 h-8 text-blue-600" />
+                <span className="text-xl font-semibold text-gray-900">Culinary Vision</span>
+              </div>
+              <div className="flex items-center gap-3">
+                {/* Favorites button */}
+                <button
+                  onClick={handleShowFavorites}
+                  className="relative flex items-center gap-2 px-4 py-2 bg-white/90 backdrop-blur-sm rounded-full shadow-md hover:bg-white transition-colors"
+                  title="View Favorites"
+                >
+                  <HeartFilledIcon className={`w-5 h-5 ${user ? 'text-red-500' : 'text-gray-400'}`} />
+                  {favoriteCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                      {favoriteCount}
+                    </span>
+                  )}
+                  {!user && (
+                    <span className="text-sm text-gray-600">Favorites</span>
+                  )}
+                </button>
+                
+                {/* User menu */}
+                {user ? (
+                  <div className="flex items-center gap-2 px-3 py-2 bg-white/90 backdrop-blur-sm rounded-full shadow-md">
+                    <UserIcon className="w-5 h-5 text-gray-600" />
+                    <span className="text-sm text-gray-700 max-w-[120px] truncate">{user.name}</span>
+                    <button
+                      onClick={handleLogout}
+                      className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+                      title="Sign Out"
+                    >
+                      <LogoutIcon className="w-4 h-4 text-gray-600" />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setIsLoginModalOpen(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors"
+                  >
+                    <UserIcon className="w-5 h-5" />
+                    <span>Sign In</span>
+                  </button>
+                )}
+              </div>
+            </div>
+            <ImageUploader onImageUpload={handleImageUpload} onTestMode={handleTestMode} />
+          </div>
+        );
+      case AppState.FAVORITES:
+        return (
+          <>
+            <FavoritesView
+              onBack={handleBackToHome}
+              onOpenAgent={(plan) => {
+                setFavoritesCulinaryPlan(plan);
+                setIsAgentOpen(true);
+              }}
+              onFavoriteChange={handleFavoriteChange}
+            />
+            {isAgentOpen && favoritesCulinaryPlan && (
+              <CookingAgent
+                context={{
+                  recipes: favoritesCulinaryPlan.recipes,
+                  ingredients: favoritesCulinaryPlan.ingredients || [],
+                  culinaryPlan: favoritesCulinaryPlan
+                }}
+                onClose={() => {
+                  setIsAgentOpen(false);
+                  setFavoritesCulinaryPlan(null);
+                }}
+              />
+            )}
+          </>
+        );
       case AppState.GENERATING:
         return (
           <div className="flex flex-col items-center justify-center h-screen bg-white p-4">
@@ -384,10 +528,54 @@ export default function App(): React.ReactElement {
         
         return (
           <>
+            {/* Navigation bar for recipe view */}
+            <div className="absolute top-4 left-4 right-4 z-20 flex justify-between items-center pointer-events-none">
+              <button
+                onClick={handleBackToHome}
+                className="flex items-center gap-2 px-4 py-2 bg-black/50 backdrop-blur-sm text-white rounded-full hover:bg-black/70 transition-colors pointer-events-auto"
+                title="Back to Home"
+              >
+                <HomeIcon className="w-5 h-5" />
+                <span className="hidden sm:inline">Home</span>
+              </button>
+              
+              <div className="flex items-center gap-3 pointer-events-auto">
+                {/* Favorites button */}
+                <button
+                  onClick={handleShowFavorites}
+                  className="relative flex items-center gap-2 px-4 py-2 bg-black/50 backdrop-blur-sm text-white rounded-full hover:bg-black/70 transition-colors"
+                  title="View Favorites"
+                >
+                  <HeartFilledIcon className="w-5 h-5 text-red-400" />
+                  {favoriteCount > 0 && (
+                    <span className="bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                      {favoriteCount}
+                    </span>
+                  )}
+                </button>
+                
+                {/* User menu */}
+                {user ? (
+                  <div className="flex items-center gap-2 px-3 py-2 bg-black/50 backdrop-blur-sm text-white rounded-full">
+                    <UserIcon className="w-5 h-5" />
+                    <span className="text-sm max-w-[100px] truncate hidden sm:inline">{user.name}</span>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setIsLoginModalOpen(true)}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors text-sm"
+                  >
+                    Sign In
+                  </button>
+                )}
+              </div>
+            </div>
+            
             <RecipeScroller 
               plan={culinaryPlan} 
               onReset={handleReset}
               onOpenAgent={() => setIsAgentOpen(true)}
+              onFavoriteChange={handleFavoriteChange}
             />
             {isAgentOpen && (
               <CookingAgent
@@ -427,6 +615,13 @@ export default function App(): React.ReactElement {
   return (
     <ErrorBoundary>
       <main className="h-screen w-screen bg-white">{renderContent()}</main>
+      
+      {/* Login Modal */}
+      <LoginModal
+        isOpen={isLoginModalOpen}
+        onClose={() => setIsLoginModalOpen(false)}
+        onLogin={handleLogin}
+      />
     </ErrorBoundary>
   );
 }
