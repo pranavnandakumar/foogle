@@ -15,20 +15,49 @@ export const FullScreenRecipeCard: React.FC<FullScreenRecipeCardProps> = ({ reci
   const [isDetailsVisible, setIsDetailsVisible] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
 
+  // If no videos available, show a beautiful gradient background instead
+  const hasVideo = videoUrls.length > 0;
+
   useEffect(() => {
     const videoElement = videoRef.current;
-    if (!videoElement || videoUrls.length === 0) return;
+    if (!videoElement || !hasVideo) return;
 
     const videoUrl = videoUrls[0];
+    console.log('Loading video URL:', videoUrl);
+    
     if (videoElement.src !== videoUrl) {
+      // Add error handlers for debugging
+      videoElement.onerror = (e) => {
+        console.error('Video load error:', e);
+        console.error('Video URL that failed:', videoUrl);
+        console.error('Video error details:', videoElement.error);
+      };
+      
+      videoElement.onloadstart = () => {
+        console.log('Video loading started');
+      };
+      
+      videoElement.onloadeddata = () => {
+        console.log('Video data loaded successfully');
+      };
+      
+      videoElement.oncanplay = () => {
+        console.log('Video can play');
+      };
+      
       videoElement.src = videoUrl;
-      videoElement.play().catch(e => console.error("Video play failed:", e));
+      videoElement.load(); // Explicitly load the video
+      videoElement.play().catch(e => {
+        console.error("Video play failed:", e);
+        console.error("Video element error code:", videoElement.error?.code);
+        console.error("Video element error message:", videoElement.error?.message);
+      });
     }
-  }, [videoUrls]);
+  }, [videoUrls, hasVideo]);
 
   const handleVideoEnded = () => {
     // Loop the single video
-    if (videoRef.current) {
+    if (videoRef.current && hasVideo) {
       videoRef.current.currentTime = 0;
       videoRef.current.play();
     }
@@ -36,27 +65,28 @@ export const FullScreenRecipeCard: React.FC<FullScreenRecipeCardProps> = ({ reci
   
   const caption = storyboard?.caption;
 
-  if (videoUrls.length === 0) {
-    return (
-        <div className="w-full h-full flex flex-col items-center justify-center bg-gray-900 text-white p-4">
-            <h2 className="text-xl font-bold">No video to display</h2>
-            <p className="text-gray-400">Placeholder videos could not be loaded.</p>
-        </div>
-    );
-  }
-
   return (
     <div className="relative h-full w-full bg-black">
-      <video
-        ref={videoRef}
-        onEnded={handleVideoEnded}
-        muted
-        autoPlay
-        playsInline
-        loop
-        className="w-full h-full object-cover"
-      />
-      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+      {hasVideo ? (
+        <>
+          <video
+            ref={videoRef}
+            onEnded={handleVideoEnded}
+            muted
+            autoPlay
+            playsInline
+            loop
+            crossOrigin="anonymous"
+            className="w-full h-full object-cover"
+            preload="auto"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+        </>
+      ) : (
+        <div className="w-full h-full bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-900">
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+        </div>
+      )}
       
       <header className="absolute top-4 right-4 z-10">
          <button

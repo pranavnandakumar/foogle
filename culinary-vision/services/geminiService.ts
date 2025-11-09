@@ -128,10 +128,38 @@ Return a single, valid JSON object matching the provided schema. Do not add expl
   }
 };
 
+// Generate a storyboard for a recipe (used when generating videos for all recipes)
+const generateRecipeStoryboard = async (recipe: Recipe, apiKey: string): Promise<Storyboard> => {
+  const ai = new GoogleGenAI({ apiKey });
+  
+  const prompt = `Generate a 10-second vertical video storyboard for this recipe: "${recipe.title}"
+
+Recipe steps: ${recipe.steps.join(', ')}
+
+Provide:
+- "hook": "One-sentence attention grabber, fun, casual"
+- "voiceover_script": "Natural narration for 10-second video, ~30-40 words, casual like TikTok"
+- "video_description": "Detailed description of the cooking video covering the key visual steps and actions that will happen in 10 seconds. Include transitions between steps."
+- "caption": "Main on-screen text/caption that will appear during the video (keep it short and punchy)"
+
+Return JSON with these fields.`;
+
+  const response = await ai.models.generateContent({
+    model: 'gemini-2.5-flash',
+    contents: { parts: [{ text: prompt }] },
+    config: {
+      responseMimeType: "application/json"
+    }
+  });
+
+  return JSON.parse(response.text) as Storyboard;
+};
+
 export const generateRecipeVideos = async (
   storyboard: Storyboard, 
   recipe: Recipe, 
-  onProgress?: (message: string) => void
+  onProgress?: (message: string) => void,
+  retryCount: number = 0
 ): Promise<string[]> => {
   const apiKey = await ensureApiKey();
   
@@ -160,15 +188,41 @@ Make it engaging and TikTok-style, showing the essence of the recipe in 10 secon
     const ai = new GoogleGenAI({ apiKey });
     onProgress?.(`🎥 Generating your 10-second video... this can take a minute.`);
     
-    let operation = await ai.models.generateVideos({
-      model: 'veo-3.1-fast-generate-preview',
-      prompt: videoPrompt,
-      config: {
-        numberOfVideos: 1,
-        resolution: '720p',
-        aspectRatio: '9:16'
+    let operation;
+    try {
+      operation = await ai.models.generateVideos({
+        model: 'veo-3.1-fast-generate-preview',
+        prompt: videoPrompt,
+        config: {
+          numberOfVideos: 1,
+          resolution: '720p',
+          aspectRatio: '9:16'
+        }
+      });
+    } catch (initError: any) {
+      // Check if the initial call failed with quota error
+      console.error('Error in initial generateVideos call:', initError);
+      const initErrorMsg = (initError?.message || JSON.stringify(initError) || '').toLowerCase();
+      if (initErrorMsg.includes('quota') || initErrorMsg.includes('429') || initErrorMsg.includes('resource_exhausted')) {
+        const quotaError = new Error("QUOTA_EXCEEDED");
+        (quotaError as any).isQuotaError = true;
+        (quotaError as any).originalError = initError;
+        throw quotaError;
       }
-    });
+      throw initError; // Re-throw if not quota error
+    }
+    
+    // Check if operation has an error field (quota errors can appear here)
+    if ((operation as any)?.error) {
+      const opError = (operation as any).error;
+      const opErrorMsg = (opError?.message || JSON.stringify(opError) || '').toLowerCase();
+      if (opErrorMsg.includes('quota') || opErrorMsg.includes('429') || opErrorMsg.includes('resource_exhausted')) {
+        const quotaError = new Error("QUOTA_EXCEEDED");
+        (quotaError as any).isQuotaError = true;
+        (quotaError as any).originalError = opError;
+        throw quotaError;
+      }
+    }
     
     let pollCount = 0;
     const maxPolls = 60; // 10 minutes max (60 * 10 seconds)
@@ -183,25 +237,79 @@ Make it engaging and TikTok-style, showing the essence of the recipe in 10 secon
       
       try {
         operation = await ai.operations.getVideosOperation({operation: operation});
+        
+        // Check for errors in operation response
+        if ((operation as any)?.error) {
+          const opError = (operation as any).error;
+          const opErrorMsg = (opError?.message || JSON.stringify(opError) || '').toLowerCase();
+          if (opErrorMsg.includes('quota') || opErrorMsg.includes('429') || opErrorMsg.includes('resource_exhausted')) {
+            const quotaError = new Error("QUOTA_EXCEEDED");
+            (quotaError as any).isQuotaError = true;
+            (quotaError as any).originalError = opError;
+            throw quotaError;
+          }
+          // If it's a different error, throw it
+          throw new Error(opError?.message || 'Operation failed');
+        }
+        
         onProgress?.(`🎥 Video is rendering... (${pollCount * 10}s elapsed)`);
-      } catch (pollError) {
+      } catch (pollError: any) {
         console.error('Error polling video operation:', pollError);
+        
+        // Check if polling error is a quota error
+        const pollErrorMsg = (pollError?.message || JSON.stringify(pollError) || '').toLowerCase();
+        if (pollErrorMsg.includes('quota') || pollErrorMsg.includes('429') || pollErrorMsg.includes('resource_exhausted')) {
+          const quotaError = new Error("QUOTA_EXCEEDED");
+          (quotaError as any).isQuotaError = true;
+          (quotaError as any).originalError = pollError;
+          throw quotaError;
+        }
+        
         throw new Error(`Failed to check video generation status: ${pollError instanceof Error ? pollError.message : 'Unknown error'}`);
       }
     }
 
-    const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
-    if (!downloadLink) {
-      throw new Error(`Video generation failed.`);
+    // Check if operation completed with an error
+    if ((operation as any)?.error) {
+      const opError = (operation as any).error;
+      const opErrorMsg = (opError?.message || JSON.stringify(opError) || '').toLowerCase();
+      if (opErrorMsg.includes('quota') || opErrorMsg.includes('429') || opErrorMsg.includes('resource_exhausted')) {
+        const quotaError = new Error("QUOTA_EXCEEDED");
+        (quotaError as any).isQuotaError = true;
+        (quotaError as any).originalError = opError;
+        throw quotaError;
+      }
+      throw new Error(opError?.message || 'Video generation failed');
     }
 
+    const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
+    if (!downloadLink) {
+      // Check if there's an error in the response
+      if ((operation.response as any)?.error) {
+        const respError = (operation.response as any).error;
+        const respErrorMsg = (respError?.message || JSON.stringify(respError) || '').toLowerCase();
+        if (respErrorMsg.includes('quota') || respErrorMsg.includes('429') || respErrorMsg.includes('resource_exhausted')) {
+          const quotaError = new Error("QUOTA_EXCEEDED");
+          (quotaError as any).isQuotaError = true;
+          (quotaError as any).originalError = respError;
+          throw quotaError;
+        }
+      }
+      throw new Error(`Video generation failed - no video URI in response`);
+    }
+
+    // Construct video URL with API key for authentication
+    // Check if URL already has query parameters
+    const separator = downloadLink.includes('?') ? '&' : '?';
+    const videoUrl = `${downloadLink}${separator}key=${apiKey}`;
+    
+    console.log('Generated video URL:', videoUrl);
     onProgress?.('✨ Your video is ready!');
-    return [`${downloadLink}&key=${apiKey}`];
+    return [videoUrl];
 
   } catch (e) {
     // Log the full error for debugging
-    console.error(`Error generating video:`, e);
-    console.error('Error details:', JSON.stringify(e, null, 2));
+    console.error(`Error generating video for "${recipe.title}":`, e);
     
     let errorBody: any = {};
     let errorMessage = 'Unknown error';
@@ -226,8 +334,13 @@ Make it engaging and TikTok-style, showing the essence of the recipe in 10 secon
       errorMessage = String(e);
     }
 
-    const status = errorStatus.toLowerCase();
-    const message = errorMessage.toLowerCase();
+    const status = (errorStatus || '').toLowerCase();
+    const message = (errorMessage || '').toLowerCase();
+    
+    // Log detailed error info for debugging
+    console.error('Error status:', status);
+    console.error('Error message:', errorMessage);
+    console.error('Full error object:', JSON.stringify(errorBody, null, 2));
 
     // Handle 404 Not Found - Invalid API key or no Veo access
     if (status.includes("not_found") || message.includes("not found") || message.includes("404")) {
@@ -235,13 +348,27 @@ Make it engaging and TikTok-style, showing the essence of the recipe in 10 secon
     }
     
     // Handle 429 Resource Exhausted - Quota exceeded
-    if (status.includes("resource_exhausted") || message.includes("quota") || message.includes("429")) {
-      throw new Error("You've exceeded your video generation quota. Please check your plan and billing details. For more info, visit ai.google.dev/gemini-api/docs/rate-limits.");
+    // DON'T retry on quota errors - they won't resolve quickly
+    if (status.includes("resource_exhausted") || message.includes("quota") || message.includes("429") || 
+        message.includes("quota exceeded") || message.includes("rate limit")) {
+      // Create a special error that can be caught and handled gracefully
+      const quotaError = new Error("QUOTA_EXCEEDED");
+      (quotaError as any).isQuotaError = true;
+      (quotaError as any).userMessage = "Video generation quota exceeded. Recipes are still available without videos. Check your Google Cloud billing and quota limits.";
+      throw quotaError;
     }
     
     // Handle permission denied / leaked API key
     if (status.includes("permission_denied") || message.includes("permission denied") || message.includes("403") || message.includes("leaked")) {
       throw new Error("Your API key was reported as leaked or doesn't have permission. Please get a new API key from https://ai.google.dev/ and update your .env.local file.");
+    }
+    
+    // Retry on transient errors (up to 2 times)
+    if (retryCount < 2 && (status.includes("unavailable") || status.includes("deadline_exceeded") || message.includes("timeout"))) {
+      const delay = Math.pow(2, retryCount) * 1000;
+      onProgress?.(`⏳ Retrying after ${delay/1000}s... (attempt ${retryCount + 1}/2)`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return generateRecipeVideos(storyboard, recipe, onProgress, retryCount + 1);
     }
     
     // Provide more detailed error message if available
@@ -251,4 +378,118 @@ Make it engaging and TikTok-style, showing the essence of the recipe in 10 secon
     
     throw new Error(userFriendlyMessage + " Please try again. If the issue persists, check your API key and Veo access.");
   }
+};
+
+// Generate videos for all recipes
+export const generateAllRecipeVideos = async (
+  recipes: Recipe[],
+  onProgress?: (message: string, currentRecipe: number, totalRecipes: number) => void
+): Promise<{ 
+  recipeVideos: { [recipeIndex: number]: string[] };
+  recipeStoryboards: { [recipeIndex: number]: Storyboard };
+  quotaExceeded: boolean;
+}> => {
+  const apiKey = await ensureApiKey();
+  const recipeVideos: { [recipeIndex: number]: string[] } = {};
+  const recipeStoryboards: { [recipeIndex: number]: Storyboard } = {};
+  let quotaExceeded = false;
+  
+  for (let i = 0; i < recipes.length; i++) {
+    const recipe = recipes[i];
+    
+    // If quota was exceeded in a previous attempt, skip remaining videos
+    if (quotaExceeded) {
+      onProgress?.(`⏸️ Skipping video generation (quota exceeded): ${recipe.title}`, i + 1, recipes.length);
+      recipeVideos[i] = [];
+      continue;
+    }
+    
+    try {
+      onProgress?.(`Generating video for: ${recipe.title}`, i + 1, recipes.length);
+      
+      // Generate storyboard for this recipe (skip if quota exceeded)
+      if (!quotaExceeded) {
+        try {
+          const storyboard = await generateRecipeStoryboard(recipe, apiKey);
+          recipeStoryboards[i] = storyboard;
+        } catch (storyboardError) {
+          console.warn(`Failed to generate storyboard for recipe ${i + 1}:`, storyboardError);
+          // Continue without storyboard
+        }
+      }
+      
+      // Generate video with progress updates
+      if (!quotaExceeded && recipeStoryboards[i]) {
+        try {
+          const videoUrls = await generateRecipeVideos(
+            recipeStoryboards[i],
+            recipe,
+            (msg) => {
+              // Ensure message is always a string
+              const progressMsg = typeof msg === 'string' ? msg : String(msg || 'Processing...');
+              onProgress?.(progressMsg, i + 1, recipes.length);
+            }
+          );
+          
+          recipeVideos[i] = videoUrls;
+          onProgress?.(`✅ Video generated for ${recipe.title}`, i + 1, recipes.length);
+          
+          // Small delay between videos to avoid rate limits (longer delay for quota protection)
+          if (i < recipes.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 3000)); // Increased to 3s
+          }
+        } catch (videoError: any) {
+          // Check if it's a quota error
+          if (videoError?.isQuotaError || 
+              (videoError instanceof Error && (
+                videoError.message.includes("QUOTA_EXCEEDED") ||
+                videoError.message.includes("quota") ||
+                videoError.message.includes("429") ||
+                videoError.message.includes("resource_exhausted")
+              ))) {
+            console.warn(`Quota exceeded while generating video for recipe ${i + 1} (${recipe.title})`);
+            quotaExceeded = true;
+            onProgress?.(`⚠️ Quota limit reached. Skipping remaining videos.`, i + 1, recipes.length);
+            recipeVideos[i] = [];
+            
+            // Skip remaining videos
+            for (let j = i + 1; j < recipes.length; j++) {
+              recipeVideos[j] = [];
+            }
+            break; // Exit the loop
+          } else {
+            // Other errors - log but continue
+            console.warn(`Failed to generate video for recipe ${i + 1} (${recipe.title}):`, videoError);
+            recipeVideos[i] = [];
+          }
+        }
+      } else {
+        recipeVideos[i] = [];
+      }
+    } catch (error: any) {
+      // Check if it's a quota error
+      if (error?.isQuotaError || 
+          (error instanceof Error && (
+            error.message.includes("QUOTA_EXCEEDED") ||
+            error.message.includes("quota") ||
+            error.message.includes("429")
+          ))) {
+        console.warn(`Quota exceeded for recipe ${i + 1}`);
+        quotaExceeded = true;
+        onProgress?.(`⚠️ Quota limit reached. Skipping remaining videos.`, i + 1, recipes.length);
+        recipeVideos[i] = [];
+        
+        // Skip remaining videos
+        for (let j = i + 1; j < recipes.length; j++) {
+          recipeVideos[j] = [];
+        }
+        break;
+      } else {
+        console.warn(`Failed to generate video for recipe ${i + 1} (${recipe.title}):`, error);
+        recipeVideos[i] = [];
+      }
+    }
+  }
+  
+  return { recipeVideos, recipeStoryboards, quotaExceeded };
 };

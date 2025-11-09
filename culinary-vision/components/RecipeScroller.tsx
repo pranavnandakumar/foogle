@@ -26,27 +26,32 @@ export const RecipeScroller: React.FC<RecipeScrollerProps> = ({ plan, onReset, o
     <div className="h-screen w-screen overflow-y-auto snap-y snap-mandatory">
       {plan.recipes.map((recipe, index) => {
         let videoUrls: string[];
-        const isFirstRecipe = index === 0;
-
-        if (isFirstRecipe) {
-          // Use generated video for the first recipe if it exists.
-          if (plan.videoUrls && plan.videoUrls.length > 0) {
-            videoUrls = plan.videoUrls;
-          } 
-          // Fallback to placeholder.
-          else {
-            videoUrls = [PLACEHOLDER_VIDEOS[0]];
-          }
+        
+        // Check if we have generated videos for this recipe
+        // Ensure we're working with arrays
+        const recipeVideoArray = plan.recipeVideos?.[index];
+        if (recipeVideoArray && Array.isArray(recipeVideoArray) && recipeVideoArray.length > 0) {
+          // Use generated video for this recipe - ensure all items are strings
+          videoUrls = recipeVideoArray.filter((url): url is string => typeof url === 'string');
+          console.log(`Recipe ${index} video URLs:`, videoUrls);
+        } else if (index === 0 && plan.videoUrls && Array.isArray(plan.videoUrls) && plan.videoUrls.length > 0) {
+          // Fallback to legacy videoUrls for first recipe - ensure all items are strings
+          videoUrls = plan.videoUrls.filter((url): url is string => typeof url === 'string');
+          console.log(`First recipe video URLs (legacy):`, videoUrls);
         } else {
-          // Other recipes get a single, looping placeholder video.
-          videoUrls = [PLACEHOLDER_VIDEOS[index % PLACEHOLDER_VIDEOS.length]];
+          // No videos available - will show beautiful gradient background
+          console.log(`No video URLs available for recipe ${index}, showing gradient background`);
+          videoUrls = [];
         }
+
+        // Use storyboard from recipeStoryboards if available, otherwise fall back to plan.storyboard for first recipe
+        const storyboard = plan.recipeStoryboards?.[index] || (index === 0 ? plan.storyboard : undefined);
 
         return (
           <div key={recipe.title} className="h-screen w-screen snap-start flex items-center justify-center bg-black">
             <FullScreenRecipeCard
               recipe={recipe}
-              storyboard={isFirstRecipe ? plan.storyboard : undefined}
+              storyboard={storyboard}
               videoUrls={videoUrls}
               onReset={onReset}
               onOpenAgent={onOpenAgent}

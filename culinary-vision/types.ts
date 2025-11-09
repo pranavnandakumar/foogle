@@ -16,8 +16,10 @@ export interface Storyboard {
 export interface CulinaryPlan {
   ingredients: string[];
   recipes: Recipe[];
-  storyboard: Storyboard;
-  videoUrls?: string[];
+  storyboard: Storyboard; // Legacy: storyboard for first recipe
+  videoUrls?: string[]; // Legacy: videos for first recipe
+  recipeVideos?: { [recipeIndex: number]: string[] }; // New: videos per recipe
+  recipeStoryboards?: { [recipeIndex: number]: Storyboard }; // New: storyboards per recipe
 }
 
 // Agent-related types
