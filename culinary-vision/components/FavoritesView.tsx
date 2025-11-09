@@ -141,109 +141,99 @@ export const FavoritesView: React.FC<FavoritesViewProps> = ({ onBack, onOpenAgen
 
   if (favorites.length === 0) {
     return (
-      <div className="h-screen w-screen bg-white flex flex-col items-center justify-center p-4">
-        {/* Navigation header */}
-        <div className="absolute top-4 left-4 right-4 z-10 flex justify-between items-center">
-          <button
-            onClick={onBack}
-            className="flex items-center gap-2 px-4 py-2 bg-white/90 backdrop-blur-sm rounded-full shadow-md hover:bg-white transition-colors"
-          >
-            <HomeIcon className="w-5 h-5 text-gray-600" />
-            <span>Home</span>
-          </button>
+      <div className="h-screen w-screen bg-gradient-to-b from-pink-50 to-white flex flex-col items-center justify-center p-4 pb-24">
+        {/* Header */}
+        <div className="absolute top-0 left-0 right-0 bg-pink-500 p-4">
+          <h1 className="text-white text-2xl font-bold">foogle</h1>
         </div>
         
-        <div className="text-center max-w-md">
-          <HeartFilledIcon className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">No Favorites Yet</h2>
-          <p className="text-gray-600 mb-6">
-            Start exploring recipes and heart your favorites to see them here!
-          </p>
-          <button
-            onClick={onBack}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-full transition-colors"
-          >
-            Explore Recipes
-          </button>
+        <div className="text-center max-w-md mt-20">
+          <h2 className="text-3xl font-bold text-white mb-2">Your favorites</h2>
+          <p className="text-white text-sm mb-8">all your past favs in one place!</p>
+          
+          <div className="bg-white rounded-lg p-8 shadow-lg">
+            <HeartFilledIcon className="w-16 h-16 text-red-500 mx-auto mb-4" />
+            <h3 className="text-xl font-bold text-gray-900 mb-2">No Favorites Yet</h3>
+            <p className="text-gray-600 mb-6">
+              Start exploring recipes and heart your favorites to see them here!
+            </p>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="h-screen w-screen bg-black relative">
-      {/* Navigation header */}
-      <div className="absolute top-4 left-4 right-4 z-20 flex justify-between items-center pointer-events-none">
-        <button
-          onClick={onBack}
-          className="flex items-center gap-2 px-4 py-2 bg-black/50 backdrop-blur-sm text-white rounded-full hover:bg-black/70 transition-colors pointer-events-auto"
-        >
-          <HomeIcon className="w-5 h-5" />
-          <span className="hidden sm:inline">Home</span>
-        </button>
-        <div className="bg-black/50 text-white px-3 py-2 rounded-full text-sm pointer-events-auto">
-          {visibleFavoriteIndex + 1} of {favorites.length}
-        </div>
+    <div className="h-screen w-screen bg-gradient-to-b from-pink-50 to-white relative pb-16">
+      {/* Header */}
+      <div className="absolute top-0 left-0 right-0 bg-pink-500 p-4 z-10">
+        <h1 className="text-white text-2xl font-bold mb-2">foogle</h1>
+        <h2 className="text-white text-xl font-semibold">Your favorites</h2>
+        <p className="text-white text-sm">all your past favs in one place!</p>
       </div>
-
-      {/* Favorites scroller */}
-      <div ref={scrollerRef} className="h-screen w-screen overflow-y-auto snap-y snap-mandatory">
-        {favorites.map((favorite, index) => {
-          // Convert favorite to CulinaryPlan format for FullScreenRecipeCard
-          const culinaryPlan: CulinaryPlan = {
-            ingredients: favorite.ingredients,
-            recipes: [favorite.recipe],
-            storyboard: favorite.storyboard || {
-              hook: '',
-              voiceover_script: '',
-              video_description: '',
-              caption: favorite.recipe.title
-            },
-            videoUrls: favorite.videoUrls || [],
-            recipeVideos: { 0: favorite.videoUrls || [] },
-            recipeStoryboards: favorite.storyboard ? { 0: favorite.storyboard } : undefined,
-            recipeVoiceovers: favorite.voiceoverUrl ? { 0: favorite.voiceoverUrl } : undefined
-          };
-
-          const isVisible = visibleFavoriteIndex === index;
-
-          return (
+      
+      {/* Favorites list */}
+      <div className="mt-32 px-4 pb-4 overflow-y-auto h-full">
+        <div className="space-y-3">
+          {favorites.map((favorite, index) => (
             <div
               key={favorite.id}
-              ref={(el) => { favoriteRefs.current[index] = el; }}
-              data-favorite-index={index}
-              className="h-screen w-screen snap-start flex items-center justify-center bg-black relative"
+              className="bg-white rounded-lg shadow-md overflow-hidden flex items-center cursor-pointer hover:shadow-lg transition-shadow"
+              onClick={() => {
+                // Convert to full-screen view when clicked
+                const culinaryPlan: CulinaryPlan = {
+                  ingredients: favorite.ingredients,
+                  recipes: [favorite.recipe],
+                  storyboard: favorite.storyboard || {
+                    hook: '',
+                    voiceover_script: '',
+                    video_description: '',
+                    caption: favorite.recipe.title
+                  },
+                  videoUrls: favorite.videoUrls || [],
+                  recipeVideos: { 0: favorite.videoUrls || [] },
+                  recipeStoryboards: favorite.storyboard ? { 0: favorite.storyboard } : undefined,
+                  recipeVoiceovers: favorite.voiceoverUrl ? { 0: favorite.voiceoverUrl } : undefined
+                };
+                onOpenAgent?.(culinaryPlan);
+              }}
             >
-              <FullScreenRecipeCard
-                recipe={favorite.recipe}
-                storyboard={favorite.storyboard}
-                videoUrls={favorite.videoUrls || []}
-                onReset={onBack}
-                onOpenAgent={() => onOpenAgent?.(culinaryPlan)}
-                culinaryPlan={culinaryPlan}
-                isVisible={isVisible}
-                recipeIndex={0}
-                onFavoriteChange={() => {
-                  // When heart is clicked, reload favorites to update the view
-                  loadFavorites();
-                  onFavoriteChange?.();
-                }}
-              />
-
-              {/* Remove favorite button overlay */}
-              <div className="absolute top-20 right-4 z-20">
-                <button
-                  onClick={() => handleRemoveFavorite(favorite.id)}
-                  className="bg-red-500/90 hover:bg-red-600 text-white p-3 rounded-full transition-colors shadow-lg flex items-center gap-2"
-                  title="Remove from favorites"
-                >
-                  <XIcon className="w-5 h-5" />
-                  <span className="hidden sm:inline text-sm">Remove</span>
-                </button>
+              {/* Recipe name on left */}
+              <div className="flex-1 p-4 bg-pink-100">
+                <h3 className="text-lg font-semibold text-pink-800">{favorite.recipe.title}</h3>
               </div>
+              
+              {/* Recipe image on right */}
+              <div className="w-24 h-24 flex-shrink-0">
+                {favorite.videoUrls && favorite.videoUrls.length > 0 ? (
+                  <video
+                    src={favorite.videoUrls[0]}
+                    className="w-full h-full object-cover"
+                    muted
+                    loop
+                    playsInline
+                  />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center">
+                    <span className="text-white text-xs font-bold">{favorite.recipe.title.charAt(0)}</span>
+                  </div>
+                )}
+              </div>
+              
+              {/* Remove button */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleRemoveFavorite(favorite.id);
+                }}
+                className="p-2 text-red-500 hover:text-red-700 transition-colors"
+                title="Remove from favorites"
+              >
+                <XIcon className="w-5 h-5" />
+              </button>
             </div>
-          );
-        })}
+          ))}
+        </div>
       </div>
     </div>
   );

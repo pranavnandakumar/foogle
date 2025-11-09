@@ -14,6 +14,8 @@ interface FullScreenRecipeCardProps {
   isVisible?: boolean;
   recipeIndex?: number;
   onFavoriteChange?: () => void;
+  isLiked?: boolean; // For feed items - pass liked state from parent
+  onLike?: () => void; // For feed items - handle like from parent
 }
 
 export const FullScreenRecipeCard: React.FC<FullScreenRecipeCardProps> = ({ 
@@ -25,7 +27,9 @@ export const FullScreenRecipeCard: React.FC<FullScreenRecipeCardProps> = ({
   culinaryPlan,
   isVisible = false,
   recipeIndex = 0,
-  onFavoriteChange
+  onFavoriteChange,
+  isLiked: externalIsLiked,
+  onLike
 }) => {
   const [isDetailsVisible, setIsDetailsVisible] = useState(false);
   const [isVoiceoverPlaying, setIsVoiceoverPlaying] = useState(false);
@@ -37,11 +41,15 @@ export const FullScreenRecipeCard: React.FC<FullScreenRecipeCardProps> = ({
 
   // Check if recipe is favorited
   useEffect(() => {
-    if (culinaryPlan?.ingredients) {
+    if (externalIsLiked !== undefined) {
+      // Use external liked state (from feed)
+      setIsFavorited(externalIsLiked);
+    } else if (culinaryPlan?.ingredients) {
+      // Check favorites service for user-generated recipes
       const favorited = favoritesService.isFavorite(recipe.title, culinaryPlan.ingredients);
       setIsFavorited(favorited);
     }
-  }, [recipe.title, culinaryPlan?.ingredients]);
+  }, [recipe.title, culinaryPlan?.ingredients, externalIsLiked]);
 
   // If no videos available, show a beautiful gradient background instead
   const hasVideo = videoUrls.length > 0;
@@ -390,7 +398,7 @@ export const FullScreenRecipeCard: React.FC<FullScreenRecipeCardProps> = ({
       )}
       
       <header className="absolute top-4 right-4 z-10 flex gap-2">
-        {/* Voiceover controls */}
+        {/* Voiceover controls - only show if voiceover exists */}
         {hasVoiceover && (
           <div className="flex gap-1 bg-black/50 rounded-full p-1">
             <button
@@ -417,7 +425,23 @@ export const FullScreenRecipeCard: React.FC<FullScreenRecipeCardProps> = ({
             </button>
           </div>
         )}
-        {/* Favorite button */}
+      </header>
+      
+      {/* Recipe title overlay (bottom left) - with proper spacing from bottom */}
+      <div className="absolute bottom-32 left-4 z-20 max-w-xs">
+        <h3 className="text-white text-2xl font-bold mb-2 drop-shadow-lg">
+          {recipe.title}
+        </h3>
+        {storyboard?.caption && (
+          <p className="text-white text-sm opacity-90 drop-shadow-md">
+            {storyboard.caption}
+          </p>
+        )}
+      </div>
+
+      {/* Interaction buttons (right side) - consistent with feed view */}
+      <div className="absolute bottom-32 right-4 z-20 flex flex-col items-center gap-4">
+        {/* Like button - works for both feed and generated recipes */}
         <button
           onClick={() => {
             if (!authService.isAuthenticated()) {
@@ -425,7 +449,11 @@ export const FullScreenRecipeCard: React.FC<FullScreenRecipeCardProps> = ({
               return;
             }
 
-            if (culinaryPlan?.ingredients) {
+            if (onLike) {
+              // Feed item - use parent's like handler
+              onLike();
+            } else if (culinaryPlan?.ingredients && culinaryPlan.ingredients.length > 0) {
+              // User-generated recipe - use favorites service
               if (isFavorited) {
                 favoritesService.removeFavorite(recipe.title, culinaryPlan.ingredients);
                 setIsFavorited(false);
@@ -443,27 +471,66 @@ export const FullScreenRecipeCard: React.FC<FullScreenRecipeCardProps> = ({
               onFavoriteChange?.();
             }
           }}
-          className={`p-2 rounded-full transition-all duration-200 ${
+          className={`p-3 rounded-full transition-all duration-200 ${
             isFavorited
               ? 'bg-red-500/90 hover:bg-red-600 text-white'
-              : 'bg-black/50 hover:bg-black/70 text-white'
+              : 'bg-white/20 hover:bg-white/30 text-white backdrop-blur-sm'
           }`}
-          title={isFavorited ? "Remove from favorites" : "Add to favorites"}
+          title={isFavorited ? "Unlike" : "Like"}
         >
           {isFavorited ? (
-            <HeartFilledIcon className="w-5 h-5" />
+            <HeartFilledIcon className="w-6 h-6" />
           ) : (
-            <HeartIcon className="w-5 h-5" />
+            <HeartIcon className="w-6 h-6" />
           )}
         </button>
+        
+        {/* Recipe button (book icon) - shows recipe details */}
         <button
-          onClick={onReset}
-          className="bg-black/50 hover:bg-indigo-600 text-white font-bold p-2 rounded-full transition-colors duration-300"
-          title="Start Over"
+          onClick={() => setIsDetailsVisible(!isDetailsVisible)}
+          className="p-3 rounded-full bg-white/20 hover:bg-white/30 text-white backdrop-blur-sm transition-all duration-200"
+          title="View recipe details"
         >
-          <ChefHatIcon className="w-6 h-6"/>
+          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+          </svg>
         </button>
-      </header>
+        
+        {/* Share button */}
+        <button
+          onClick={() => {
+            if (navigator.share) {
+              navigator.share({
+                title: recipe.title,
+                text: `Check out this recipe: ${recipe.title}`,
+                url: window.location.href
+              }).catch(() => {});
+            } else {
+              // Fallback: copy to clipboard
+              navigator.clipboard.writeText(`${recipe.title} - ${window.location.href}`).then(() => {
+                alert('Recipe link copied to clipboard!');
+              });
+            }
+          }}
+          className="p-3 rounded-full bg-white/20 hover:bg-white/30 text-white backdrop-blur-sm transition-all duration-200"
+          title="Share recipe"
+        >
+          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+          </svg>
+        </button>
+        
+        {/* AI Assistant button */}
+        {onOpenAgent && (
+          <button
+            onClick={() => onOpenAgent()}
+            className="p-3 rounded-full bg-white/20 hover:bg-white/30 text-white backdrop-blur-sm transition-all duration-200"
+            title="Open AI Assistant"
+          >
+            <SparklesIcon className="w-6 h-6" />
+          </button>
+        )}
+      </div>
       
       {/* Login prompt */}
       {showLoginPrompt && (
@@ -505,39 +572,16 @@ export const FullScreenRecipeCard: React.FC<FullScreenRecipeCardProps> = ({
         />
       )}
 
-      <footer className="absolute bottom-0 left-0 right-0 p-4 sm:p-6 text-white z-10">
-        {caption && <p className="text-center font-bold mb-4 bg-black/50 py-1 px-3 rounded-full inline-block">{caption}</p>}
-        <h1 className="text-3xl md:text-5xl font-bold tracking-tight text-white drop-shadow-lg">{recipe.title}</h1>
-        {storyboard?.hook && <p className="mt-2 text-lg text-indigo-300 font-semibold italic drop-shadow-md">"{storyboard.hook}"</p>}
-        <div className="mt-4 flex gap-2 flex-wrap">
-          <button 
-            onClick={() => setIsDetailsVisible(true)}
-            className="flex items-center justify-center px-4 py-2 font-semibold bg-white/20 backdrop-blur-md rounded-lg hover:bg-white/30 transition-colors"
-          >
-              <ListIcon className="w-5 h-5"/>
-              <span className="ml-2">View Recipe</span>
-          </button>
-          {onOpenAgent && (
-            <button 
-              onClick={onOpenAgent}
-              className="flex items-center justify-center px-4 py-2 font-semibold bg-indigo-600/80 backdrop-blur-md rounded-lg hover:bg-indigo-700/80 transition-colors"
-            >
-                <SparklesIcon className="w-5 h-5"/>
-                <span className="ml-2">AI Assistant</span>
-            </button>
-          )}
-        </div>
-      </footer>
 
       {isDetailsVisible && (
-        <div className="absolute inset-0 bg-gray-900/95 backdrop-blur-md z-20 p-4 sm:p-8 flex flex-col text-white overflow-y-auto">
+        <div className="absolute inset-0 bg-gray-900/95 backdrop-blur-md z-40 p-4 sm:p-8 flex flex-col text-white overflow-y-auto pb-20">
           <header className="flex justify-between items-start mb-4">
             <h1 className="text-3xl font-bold">{recipe.title}</h1>
-            <button onClick={() => setIsDetailsVisible(false)} className="p-2">
+            <button onClick={() => setIsDetailsVisible(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
               <XIcon className="w-8 h-8"/>
             </button>
           </header>
-          <div className="flex-grow overflow-y-auto">
+          <div className="flex-grow overflow-y-auto pb-4">
             <div className="flex items-center space-x-6 my-4 border-t border-b border-gray-700 py-3">
               <div className="flex items-center space-x-2"><ClockIcon className="w-5 h-5 text-indigo-400" /><span>{recipe.time_minutes} min</span></div>
               <div className="flex items-center space-x-2"><BarChartIcon className="w-5 h-5 text-indigo-400" /><span className="capitalize">{recipe.difficulty}</span></div>

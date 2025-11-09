@@ -7,42 +7,26 @@ interface ImageUploaderProps {
 }
 
 export const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageUpload, onTestMode }) => {
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [file, setFile] = useState<File | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const dropRef = useRef<HTMLDivElement>(null);
 
-  const handleFileChange = (selectedFile: File) => {
+  const handleFileSelect = (file: File) => {
+    setSelectedFile(file);
+  };
+
+  const handleUpload = () => {
     if (selectedFile) {
-      setFile(selectedFile);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(selectedFile);
+      onImageUpload(selectedFile);
     }
   };
 
-  const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = event.target.files?.[0];
-    if (selectedFile) {
-      handleFileChange(selectedFile);
+  const handleTestMode = () => {
+    if (selectedFile && onTestMode) {
+      onTestMode(selectedFile);
     }
   };
-
-  const handleGenerateClick = () => {
-    if (file) {
-      onImageUpload(file);
-    }
-  };
-
-  const handleTestModeClick = () => {
-    if (file && onTestMode) {
-      onTestMode(file);
-    }
-  };
-
-  const triggerFileSelect = () => fileInputRef.current?.click();
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -57,129 +41,115 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageUpload, onT
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-    const droppedFile = e.dataTransfer.files?.[0];
-    if (droppedFile && droppedFile.type.startsWith('image/')) {
-      handleFileChange(droppedFile);
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith('image/')) {
+      handleFileSelect(file);
     }
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-white p-6">
-      <div className="w-full max-w-3xl">
-        {/* Header - Clean Google-style */}
-        <div className="text-center mb-12">
-          <h1 className="text-5xl sm:text-6xl font-normal text-gray-900 mb-4 tracking-tight">
-            Culinary Vision
-          </h1>
-          <p className="text-xl text-gray-600 font-light">
-            Transform your ingredients into recipes with AI-powered cooking videos
+    <div className="min-h-screen bg-teal-50 flex flex-col items-center justify-center p-6 pb-24">
+      {/* Header */}
+      <div className="absolute top-0 left-0 right-0 bg-teal-500 p-4">
+        <h1 className="text-white text-2xl font-bold">foogle</h1>
+      </div>
+      
+      <div className="max-w-md w-full mt-20">
+        {/* Main Content */}
+        <div className="text-center mb-8">
+          <h2 className="text-3xl font-bold text-white mb-2">
+            Upload your Ingredients Here!
+          </h2>
+          <p className="text-gray-300 text-sm">
+            Get ready to chef it up!
           </p>
         </div>
 
-        {/* Upload Area - Google Material Design Style */}
+        {/* Upload Area */}
         <div
-          className={`w-full border-2 border-dashed rounded-lg p-12 transition-all duration-200 ${
-            isDragging
-              ? 'border-blue-500 bg-blue-50'
-              : imagePreview
-              ? 'border-gray-300 bg-gray-50'
-              : 'border-gray-300 bg-white hover:border-gray-400 hover:bg-gray-50'
-          } cursor-pointer`}
-          onClick={triggerFileSelect}
+          ref={dropRef}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
+          onClick={() => fileInputRef.current?.click()}
+          className={`
+            border-2 border-dashed rounded-lg p-12 text-center cursor-pointer
+            transition-all duration-200 bg-gray-100
+            ${isDragging 
+              ? 'border-teal-500 bg-teal-50' 
+              : 'border-gray-300 hover:border-teal-400'
+            }
+          `}
         >
+          <div className="flex flex-col items-center">
+            <div className="w-12 h-12 mb-4 flex items-center justify-center">
+              <div className="flex gap-1">
+                <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+              </div>
+            </div>
+            <p className="text-gray-700 font-medium mb-2">Choose Image</p>
+            <UploadIcon className="w-8 h-8 text-gray-600" />
+          </div>
           <input
+            ref={fileInputRef}
             type="file"
             accept="image/*"
-            onChange={handleInputChange}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) {
+                handleFileSelect(file);
+              }
+            }}
             className="hidden"
-            ref={fileInputRef}
           />
-          
-          {imagePreview ? (
-            <div className="flex flex-col items-center">
-              <img
-                src={imagePreview}
-                alt="Preview"
-                className="max-h-64 max-w-full rounded-lg shadow-md object-contain mb-4"
-              />
-              <p className="text-sm text-gray-500 mt-2">Click to change image</p>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center text-center">
-              <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center mb-4">
-                <UploadIcon className="w-8 h-8 text-blue-600" />
-              </div>
-              <p className="text-lg font-medium text-gray-700 mb-2">
-                Upload an image of your ingredients
-              </p>
-              <p className="text-sm text-gray-500">
-                Drag and drop or click to browse
-              </p>
-              <p className="text-xs text-gray-400 mt-2">
-                Supports JPEG, PNG, WebP
-              </p>
-            </div>
-          )}
         </div>
 
-        {/* Generate Buttons - Google Material Style */}
-        <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center items-center">
-          <button
-            onClick={handleGenerateClick}
-            disabled={!file}
-            className={`px-8 py-3 rounded-full text-base font-medium transition-all duration-200 ${
-              file
-                ? 'bg-blue-600 text-white hover:bg-blue-700 hover:shadow-lg active:bg-blue-800'
-                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-            }`}
-          >
-            Generate Recipes
-          </button>
-          
-          {onTestMode && (
-            <button
-              onClick={handleTestModeClick}
-              disabled={!file}
-              className={`px-6 py-3 rounded-full text-base font-medium transition-all duration-200 border-2 ${
-                file
-                  ? 'border-gray-300 text-gray-700 bg-white hover:bg-gray-50 hover:border-gray-400'
-                  : 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed'
-              }`}
-              title="Test mode: Skip video generation and use placeholder content"
-            >
-              🧪 Test Mode
-            </button>
-          )}
-        </div>
-        
-        {onTestMode && (
-          <p className="text-xs text-gray-500 text-center mt-2">
-            Test Mode skips video generation and uses placeholder content
-          </p>
+        {/* Preview */}
+        {selectedFile && (
+          <div className="mt-6">
+            <img
+              src={URL.createObjectURL(selectedFile)}
+              alt="Preview"
+              className="w-full rounded-lg shadow-lg"
+            />
+          </div>
         )}
 
-        {/* Features List - Subtle Google-style */}
-        <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
-          <div className="p-4">
-            <div className="text-2xl mb-2">🎬</div>
-            <h3 className="font-medium text-gray-900 mb-1">AI Video Generation</h3>
-            <p className="text-sm text-gray-600">Watch your recipes come to life</p>
-          </div>
-          <div className="p-4">
-            <div className="text-2xl mb-2">🤖</div>
-            <h3 className="font-medium text-gray-900 mb-1">Smart Assistant</h3>
-            <p className="text-sm text-gray-600">Get cooking tips and meal plans</p>
-          </div>
-          <div className="p-4">
-            <div className="text-2xl mb-2">⚡</div>
-            <h3 className="font-medium text-gray-900 mb-1">Instant Recipes</h3>
-            <p className="text-sm text-gray-600">From ingredients to recipes in seconds</p>
-          </div>
-        </div>
+        {/* Generate Button */}
+        <button
+          onClick={selectedFile ? handleUpload : () => fileInputRef.current?.click()}
+          className={`
+            w-full mt-6 py-4 px-6 rounded-lg font-bold text-white text-lg
+            transition-all duration-200
+            ${selectedFile
+              ? 'bg-teal-500 hover:bg-teal-600 shadow-lg'
+              : 'bg-gray-400 cursor-not-allowed'
+            }
+          `}
+        >
+          Generate!
+        </button>
+
+        {/* Test Mode Button */}
+        {onTestMode && (
+          <button
+            onClick={handleTestMode}
+            disabled={!selectedFile}
+            className="w-full mt-3 py-2 px-4 rounded-lg font-medium text-gray-600 bg-white hover:bg-gray-100 transition-all duration-200 border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Test Mode (Skip Video Generation)
+          </button>
+        )}
       </div>
+      
+      {/* Floating Action Button for Chat */}
+      <button className="fixed bottom-20 right-6 w-12 h-12 bg-orange-500 rounded-full flex items-center justify-center shadow-lg hover:bg-orange-600 transition-colors z-40">
+        <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+        </svg>
+      </button>
     </div>
   );
 };

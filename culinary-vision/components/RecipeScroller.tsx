@@ -174,7 +174,7 @@ export const RecipeScroller: React.FC<RecipeScrollerProps> = ({ plan, onReset, o
             key={recipe.title} 
             ref={(el) => { recipeRefs.current[index] = el; }}
             data-recipe-index={index}
-            className="h-screen w-screen snap-start flex items-center justify-center bg-black"
+            className="h-screen w-screen snap-start flex items-center justify-center bg-black pb-20"
           >
             <FullScreenRecipeCard
               recipe={recipe}
