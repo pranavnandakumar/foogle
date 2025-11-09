@@ -101,43 +101,140 @@ export const FullScreenRecipeCard: React.FC<FullScreenRecipeCardProps> = ({
     };
   }, [recipeIndex, recipe.title]);
 
-  // Video loading effect
+  // Video loading and playback effect
   useEffect(() => {
     const videoElement = videoRef.current;
     if (!videoElement || !hasVideo) return;
 
     const videoUrl = videoUrls[0];
-    console.log('Loading video URL:', videoUrl);
-    
-    if (videoElement.src !== videoUrl) {
-      // Add error handlers for debugging
-      videoElement.onerror = (e) => {
-        console.error('Video load error:', e);
-        console.error('Video URL that failed:', videoUrl);
-        console.error('Video error details:', videoElement.error);
-      };
-      
-      videoElement.onloadstart = () => {
-        console.log('Video loading started');
-      };
-      
-      videoElement.onloadeddata = () => {
-        console.log('Video data loaded successfully');
-      };
-      
-      videoElement.oncanplay = () => {
-        console.log('Video can play');
-      };
-      
-      videoElement.src = videoUrl;
-      videoElement.load(); // Explicitly load the video
-      videoElement.play().catch(e => {
-        console.error("Video play failed:", e);
-        console.error("Video element error code:", videoElement.error?.code);
-        console.error("Video element error message:", videoElement.error?.message);
-      });
+    if (!videoUrl) {
+      console.warn('No video URL provided for recipe:', recipe.title);
+      return;
     }
-  }, [videoUrls, hasVideo]);
+    
+    // Get current src (could be full URL or relative path)
+    const currentSrc = videoElement.src || '';
+    const currentPath = currentSrc.replace(window.location.origin, '');
+    const needsNewSource = currentPath !== videoUrl && !currentSrc.endsWith(videoUrl);
+    
+    if (needsNewSource) {
+      console.log('Setting video source:', videoUrl, 'for recipe:', recipe.title);
+      
+      // Set up error handlers
+      const handleError = (e: Event) => {
+        console.error('❌ Video load error for:', recipe.title);
+        console.error('Video URL:', videoUrl);
+        console.error('Error code:', videoElement.error?.code);
+        console.error('Error message:', videoElement.error?.message);
+        if (videoElement.error) {
+          console.error('Error details:', {
+            code: videoElement.error.code,
+            message: videoElement.error.message
+          });
+        }
+      };
+      
+      const handleLoadedMetadata = () => {
+        console.log('📹 Video metadata loaded:', videoUrl);
+      };
+      
+      const handleLoadedData = () => {
+        console.log('✅ Video data loaded:', videoUrl);
+        // Try to play if visible
+        if (isVisible && videoElement.paused) {
+          videoElement.play().catch(e => {
+            console.log('⚠️ Auto-play blocked (normal for some browsers):', e);
+          });
+        }
+      };
+      
+      const handleCanPlay = () => {
+        console.log('▶️ Video can play:', videoUrl);
+        // Ensure video plays if visible
+        if (isVisible && videoElement.paused) {
+          videoElement.play().catch(e => {
+            console.log('⚠️ Play prevented:', e);
+          });
+        }
+      };
+      
+      const handleCanPlayThrough = () => {
+        console.log('🎬 Video can play through:', videoUrl);
+        if (isVisible && videoElement.paused) {
+          videoElement.play().catch(e => {
+            console.log('⚠️ Play prevented:', e);
+          });
+        }
+      };
+      
+      // Remove old event listeners
+      videoElement.onerror = null;
+      videoElement.onloadedmetadata = null;
+      videoElement.onloadeddata = null;
+      videoElement.oncanplay = null;
+      videoElement.oncanplaythrough = null;
+      
+      // Add new event listeners
+      videoElement.onerror = handleError;
+      videoElement.onloadedmetadata = handleLoadedMetadata;
+      videoElement.onloadeddata = handleLoadedData;
+      videoElement.oncanplay = handleCanPlay;
+      videoElement.oncanplaythrough = handleCanPlayThrough;
+      
+      // Set source and load
+      videoElement.src = videoUrl;
+      videoElement.load();
+    }
+  }, [videoUrls, hasVideo, recipe.title, isVisible]);
+
+  // Play/pause video based on visibility
+  useEffect(() => {
+    const videoElement = videoRef.current;
+    if (!videoElement || !hasVideo) return;
+
+    if (isVisible) {
+      // Video should play when visible
+      const attemptPlay = async () => {
+        try {
+          // Wait a bit for video to be ready
+          if (videoElement.readyState >= 2) { // HAVE_CURRENT_DATA
+            if (videoElement.paused) {
+              await videoElement.play();
+              console.log('▶️ Video playing:', recipe.title);
+            }
+          } else {
+            // Wait for video to be ready
+            const waitForReady = () => {
+              if (videoElement.readyState >= 2) {
+                if (videoElement.paused) {
+                  videoElement.play().then(() => {
+                    console.log('▶️ Video playing (after wait):', recipe.title);
+                  }).catch(e => {
+                    console.log('⚠️ Play failed:', e);
+                  });
+                }
+              } else {
+                setTimeout(waitForReady, 50);
+              }
+            };
+            waitForReady();
+          }
+        } catch (error) {
+          console.log('⚠️ Video play error (may need user interaction):', error);
+        }
+      };
+      
+      // Try to play after a short delay
+      const timeoutId = setTimeout(attemptPlay, 150);
+      return () => clearTimeout(timeoutId);
+    } else {
+      // Pause video when not visible to save resources
+      if (!videoElement.paused) {
+        videoElement.pause();
+        console.log('⏸️ Video paused:', recipe.title);
+      }
+    }
+  }, [isVisible, hasVideo, recipe.title]);
 
   // Voiceover audio effect - load audio IMMEDIATELY and preload
   useEffect(() => {
@@ -381,18 +478,26 @@ export const FullScreenRecipeCard: React.FC<FullScreenRecipeCardProps> = ({
     <div className="relative h-full w-full bg-black">
       {hasVideo ? (
         <>
-      <video
-        ref={videoRef}
-        onEnded={handleVideoEnded}
-        muted
-        autoPlay
-        playsInline
-        loop
+          <video
+            ref={videoRef}
+            src={videoUrls[0]}
+            onEnded={handleVideoEnded}
+            muted
+            autoPlay
+            playsInline
+            loop
             crossOrigin="anonymous"
-        className="w-full h-full object-cover"
+            className="w-full h-full object-cover"
             preload="auto"
-      />
-      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+            onError={(e) => {
+              console.error('Video element error:', e);
+              console.error('Video URL:', videoUrls[0]);
+            }}
+            onLoadedData={() => {
+              console.log('Video loaded in element:', videoUrls[0]);
+            }}
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
         </>
       ) : (
         <div className="w-full h-full bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-900">

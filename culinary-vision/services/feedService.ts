@@ -26,16 +26,16 @@ const FEED_CACHE_KEY = 'culinary_vision_feed_cache';
 const LIKED_RECIPES_KEY = 'culinary_vision_liked_feed_recipes';
 const USER_RECIPES_KEY = 'culinary_vision_user_feed_recipes';
 
-// Default recipe videos (using existing placeholder videos)
+// Default recipe videos (using local video files)
 const DEFAULT_VIDEOS = [
-  'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4',
-  'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4',
-  'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerMeltdowns.mp4',
-  'https://storage.googleapis.com/gtv-videos-bucket/sample/SubaruOutbackOnStreetAndDirt.mp4',
-  'https://storage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4',
-  'https://storage.googleapis.com/gtv-videos-bucket/sample/WeAreGoingOnBullrun.mp4',
-  'https://storage.googleapis.com/gtv-videos-bucket/sample/WhatCarCanYouGetForAGrand.mp4',
-  'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+  '/vids/berrymilksmoothie.mp4',
+  '/vids/avacadotoast.mp4',
+  '/vids/overnightoats.mp4',
+  '/vids/lemonchicken.mp4',
+  '/vids/thaibasilcurry.mp4',
+  '/vids/mexicancorn.mp4',
+  '/vids/vegetablecurry.mp4',
+  '/vids/herbcrustedsalmon.mp4',
 ];
 
 // 10 Default recipes covering wide range of ingredients and meal types
@@ -512,15 +512,28 @@ export const feedService = {
 
   // Get personalized feed (mixes default and user recipes)
   getFeed(maxItems: number = 10): FeedItem[] {
-    // Try to get cached feed first
+    // Check if cached feed has old Google video URLs - if so, clear cache
     const cached = this.getCachedFeed();
     if (cached && cached.length >= maxItems) {
-      // Update liked status
-      const likedIds = this.getLikedRecipeIds();
-      return cached.map(item => ({
-        ...item,
-        isLiked: likedIds.has(item.id)
-      }));
+      // Check if any default items are using old Google Cloud Storage URLs
+      const hasOldVideos = cached.some(item => 
+        item.isDefault && 
+        item.videoUrl && 
+        item.videoUrl.includes('storage.googleapis.com/gtv-videos-bucket')
+      );
+      
+      if (!hasOldVideos) {
+        // Cache is valid, just update liked status
+        const likedIds = this.getLikedRecipeIds();
+        return cached.map(item => ({
+          ...item,
+          isLiked: likedIds.has(item.id)
+        }));
+      } else {
+        // Cache has old videos, clear it and rebuild
+        console.log('Clearing feed cache - detected old video URLs');
+        localStorage.removeItem(FEED_CACHE_KEY);
+      }
     }
 
     // Build feed from scratch
@@ -528,7 +541,7 @@ export const feedService = {
     const likedIds = this.getLikedRecipeIds();
     const feed: FeedItem[] = [];
 
-    // Initialize default recipes
+    // Initialize default recipes with new video URLs
     const defaultItems: FeedItem[] = DEFAULT_RECIPES.map((recipe, index) => ({
       ...recipe,
       id: `default_${index}`,
@@ -626,6 +639,12 @@ export const feedService = {
     // Clear cache to force regeneration
     localStorage.removeItem(FEED_CACHE_KEY);
     return this.getFeed(maxItems);
+  },
+
+  // Clear feed cache (useful for forcing refresh with new video URLs)
+  clearFeedCache(): void {
+    localStorage.removeItem(FEED_CACHE_KEY);
+    console.log('Feed cache cleared');
   }
 };
 

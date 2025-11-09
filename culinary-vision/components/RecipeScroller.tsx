@@ -11,14 +11,14 @@ interface RecipeScrollerProps {
 
 // Placeholder videos to use for the UI layout while generation is disabled.
 const PLACEHOLDER_VIDEOS = [
-    'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4',
-    'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4',
-    'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerMeltdowns.mp4',
-    'https://storage.googleapis.com/gtv-videos-bucket/sample/SubaruOutbackOnStreetAndDirt.mp4',
-    'https://storage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4',
-    'https://storage.googleapis.com/gtv-videos-bucket/sample/WeAreGoingOnBullrun.mp4',
-    'https://storage.googleapis.com/gtv-videos-bucket/sample/WhatCarCanYouGetForAGrand.mp4',
-    'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+  '"/vids/berrymilksmoothie.mp4"',
+  '/vids/avacadotoast.mp4',
+  '/vids/overnightoats.mp4',
+  '/vids/lemonchicken.mp4',
+  '/vids/thaibasilcurry.mp4',
+  '/vids/mexicancorn.mp4',
+  '/vids/vegetablecurry.mp4',
+  '/vids/herbcrustedsalmon.mp4',
 ];
 
 

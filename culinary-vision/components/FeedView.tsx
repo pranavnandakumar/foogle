@@ -21,9 +21,12 @@ export const FeedView: React.FC<FeedViewProps> = ({ onClose, onRecipeLike, onOpe
   const loadFeed = useCallback(() => {
     setIsLoading(true);
     try {
+      // Clear cache if it contains old Google video URLs (happens automatically in getFeed)
+      // This ensures we always use the latest video URLs
       const feed = feedService.getFeed(10);
       setFeedItems(feed);
       console.log('Loaded feed with', feed.length, 'items');
+      console.log('Sample video URLs:', feed.slice(0, 3).map(item => item.videoUrl));
     } catch (error) {
       console.error('Error loading feed:', error);
     } finally {
