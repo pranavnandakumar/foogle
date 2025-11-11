@@ -57,10 +57,10 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageUpload, onT
       <div className="max-w-md w-full mt-20">
         {/* Main Content */}
         <div className="text-center mb-8">
-          <h2 className="text-3xl font-bold text-white mb-2">
+          <h2 className="text-3xl font-bold text-blue-600 mb-2">
             Upload your Ingredients Here!
           </h2>
-          <p className="text-gray-300 text-sm">
+          <p className="text-gray-600 text-sm">
             Get ready to chef it up!
           </p>
         </div>

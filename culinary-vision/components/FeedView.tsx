@@ -21,12 +21,15 @@ export const FeedView: React.FC<FeedViewProps> = ({ onClose, onRecipeLike, onOpe
   const loadFeed = useCallback(() => {
     setIsLoading(true);
     try {
-      // Clear cache if it contains old Google video URLs (happens automatically in getFeed)
-      // This ensures we always use the latest video URLs
+      // Force refresh feed to clear cache and ensure correct video mappings
+      feedService.forceRefreshFeed();
       const feed = feedService.getFeed(10);
       setFeedItems(feed);
       console.log('Loaded feed with', feed.length, 'items');
-      console.log('Sample video URLs:', feed.slice(0, 3).map(item => item.videoUrl));
+      console.log('Video-to-Recipe Mappings:');
+      feed.forEach((item, index) => {
+        console.log(`  ${index + 1}. Recipe: "${item.recipe.title}" -> Video: ${item.videoUrl || 'NO VIDEO'}`);
+      });
     } catch (error) {
       console.error('Error loading feed:', error);
     } finally {
@@ -52,14 +55,14 @@ export const FeedView: React.FC<FeedViewProps> = ({ onClose, onRecipeLike, onOpe
     };
   }, [loadFeed]);
 
-  // Set up Intersection Observer for feed scrolling
+  // Set up Intersection Observer for feed scrolling - MORE AGGRESSIVE
   useEffect(() => {
     if (feedItems.length === 0) return;
 
     const observerOptions = {
       root: scrollerRef.current,
-      rootMargin: '-45% 0px -45% 0px',
-      threshold: [0, 0.25, 0.5, 0.75, 1.0]
+      rootMargin: '-40% 0px -40% 0px', // More aggressive - larger visible area
+      threshold: [0, 0.1, 0.25, 0.5, 0.75, 0.9, 1.0] // More granular thresholds
     };
 
     const observer = new IntersectionObserver((entries) => {
@@ -68,23 +71,29 @@ export const FeedView: React.FC<FeedViewProps> = ({ onClose, onRecipeLike, onOpe
 
       entries.forEach((entry) => {
         const index = parseInt(entry.target.getAttribute('data-feed-index') || '-1');
-        if (index >= 0 && entry.intersectionRatio > maxRatio) {
-          maxRatio = entry.intersectionRatio;
-          mostVisibleIndex = index;
+        if (index >= 0) {
+          // Use intersection ratio to find most visible
+          if (entry.intersectionRatio > maxRatio) {
+            maxRatio = entry.intersectionRatio;
+            mostVisibleIndex = index;
+          }
         }
       });
 
       if (mostVisibleIndex >= 0 && mostVisibleIndex !== visibleItemIndex) {
+        console.log(`Feed: Switching to item ${mostVisibleIndex} (${feedItems[mostVisibleIndex]?.recipe.title})`);
         setVisibleItemIndex(mostVisibleIndex);
       }
     }, observerOptions);
 
-    itemRefs.current.forEach((ref) => {
+    // Observe all item refs
+    itemRefs.current.forEach((ref, index) => {
       if (ref) {
         observer.observe(ref);
       }
     });
 
+    // Set initial visible item
     if (itemRefs.current[0]) {
       setVisibleItemIndex(0);
     }
@@ -92,9 +101,9 @@ export const FeedView: React.FC<FeedViewProps> = ({ onClose, onRecipeLike, onOpe
     return () => {
       observer.disconnect();
     };
-  }, [feedItems.length, visibleItemIndex]);
+  }, [feedItems.length, visibleItemIndex, feedItems]);
 
-  // Scroll event handler
+  // Scroll event handler - IMMEDIATE response for video playback
   useEffect(() => {
     const scroller = scrollerRef.current;
     if (!scroller || feedItems.length === 0) return;
@@ -123,10 +132,12 @@ export const FeedView: React.FC<FeedViewProps> = ({ onClose, onRecipeLike, onOpe
       });
 
       if (closestIndex >= 0 && closestIndex !== visibleItemIndex) {
+        console.log(`Feed scroll: Switching to item ${closestIndex} (${feedItems[closestIndex]?.recipe.title})`);
         setVisibleItemIndex(closestIndex);
       }
     };
 
+    // Use requestAnimationFrame for smooth, immediate updates
     let rafId: number;
     const optimizedScrollHandler = () => {
       cancelAnimationFrame(rafId);
@@ -134,13 +145,14 @@ export const FeedView: React.FC<FeedViewProps> = ({ onClose, onRecipeLike, onOpe
     };
 
     scroller.addEventListener('scroll', optimizedScrollHandler, { passive: true });
+    // Also check immediately on mount
     handleScroll();
 
     return () => {
       scroller.removeEventListener('scroll', optimizedScrollHandler);
       cancelAnimationFrame(rafId);
     };
-  }, [feedItems.length, visibleItemIndex]);
+  }, [feedItems.length, visibleItemIndex, feedItems]);
 
   const handleLike = useCallback((feedItem: FeedItem) => {
     if (!authService.isAuthenticated()) {
@@ -197,7 +209,7 @@ export const FeedView: React.FC<FeedViewProps> = ({ onClose, onRecipeLike, onOpe
         <h1 className="text-white text-2xl font-bold">foogle</h1>
       </div>
 
-      {/* Feed scroller */}
+      {/* Feed scroller - render all items for proper video preloading */}
       <div ref={scrollerRef} className="h-screen w-screen overflow-y-auto snap-y snap-mandatory pt-16">
         {feedItems.map((feedItem, index) => {
           // Convert feed item to CulinaryPlan format
@@ -217,15 +229,18 @@ export const FeedView: React.FC<FeedViewProps> = ({ onClose, onRecipeLike, onOpe
           };
 
           const isVisible = visibleItemIndex === index;
+          // Preload videos for adjacent items (previous and next) for smoother scrolling
+          const shouldPreload = Math.abs(index - visibleItemIndex) <= 1;
 
           return (
             <div
-              key={feedItem.id}
+              key={`feed-${feedItem.id}-${index}`}
               ref={(el) => { itemRefs.current[index] = el; }}
               data-feed-index={index}
               className="h-screen w-screen snap-start flex items-center justify-center bg-black relative pb-20"
             >
               <FullScreenRecipeCard
+                key={`card-${feedItem.id}-${index}`}
                 recipe={feedItem.recipe}
                 storyboard={feedItem.storyboard}
                 videoUrls={feedItem.videoUrl ? [feedItem.videoUrl] : []}
@@ -233,7 +248,7 @@ export const FeedView: React.FC<FeedViewProps> = ({ onClose, onRecipeLike, onOpe
                 onOpenAgent={() => onOpenAgent?.(culinaryPlan)}
                 culinaryPlan={culinaryPlan}
                 isVisible={isVisible}
-                recipeIndex={0}
+                recipeIndex={index}
                 isLiked={feedItem.isLiked}
                 onLike={() => handleLike(feedItem)}
               />

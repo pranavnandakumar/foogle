@@ -101,7 +101,7 @@ export const FullScreenRecipeCard: React.FC<FullScreenRecipeCardProps> = ({
     };
   }, [recipeIndex, recipe.title]);
 
-  // Video loading and playback effect
+  // Video loading effect - ALWAYS load source immediately, don't wait for visibility
   useEffect(() => {
     const videoElement = videoRef.current;
     if (!videoElement || !hasVideo) return;
@@ -112,62 +112,61 @@ export const FullScreenRecipeCard: React.FC<FullScreenRecipeCardProps> = ({
       return;
     }
     
-    // Get current src (could be full URL or relative path)
+    // Always ensure source is set - don't wait for visibility
+    // Simplify source check - just compare the filename
     const currentSrc = videoElement.src || '';
-    const currentPath = currentSrc.replace(window.location.origin, '');
-    const needsNewSource = currentPath !== videoUrl && !currentSrc.endsWith(videoUrl);
+    const videoFileName = videoUrl.split('/').pop() || '';
+    const currentFileName = currentSrc.split('/').pop()?.split('?')[0] || '';
+    
+    // Check if we need to set a new source (compare filenames)
+    const needsNewSource = !currentSrc || currentFileName !== videoFileName;
     
     if (needsNewSource) {
-      console.log('Setting video source:', videoUrl, 'for recipe:', recipe.title);
+      console.log(`🎥 Loading video source for "${recipe.title}":`, videoUrl);
       
       // Set up error handlers
       const handleError = (e: Event) => {
         console.error('❌ Video load error for:', recipe.title);
         console.error('Video URL:', videoUrl);
+        console.error('Current src:', videoElement.src);
         console.error('Error code:', videoElement.error?.code);
         console.error('Error message:', videoElement.error?.message);
-        if (videoElement.error) {
-          console.error('Error details:', {
-            code: videoElement.error.code,
-            message: videoElement.error.message
-          });
-        }
       };
       
       const handleLoadedMetadata = () => {
-        console.log('📹 Video metadata loaded:', videoUrl);
+        console.log(`📹 Metadata loaded: ${recipe.title}`, videoUrl);
       };
       
       const handleLoadedData = () => {
-        console.log('✅ Video data loaded:', videoUrl);
-        // Try to play if visible
+        console.log(`✅ Data loaded: ${recipe.title}`, videoUrl);
+        // Video is ready - play if visible
         if (isVisible && videoElement.paused) {
           videoElement.play().catch(e => {
-            console.log('⚠️ Auto-play blocked (normal for some browsers):', e);
+            console.log(`⚠️ Auto-play blocked for ${recipe.title}:`, e);
           });
         }
       };
       
       const handleCanPlay = () => {
-        console.log('▶️ Video can play:', videoUrl);
-        // Ensure video plays if visible
+        console.log(`▶️ Can play: ${recipe.title}`, videoUrl);
+        // Video can play - play if visible
         if (isVisible && videoElement.paused) {
           videoElement.play().catch(e => {
-            console.log('⚠️ Play prevented:', e);
+            console.log(`⚠️ Play prevented for ${recipe.title}:`, e);
           });
         }
       };
       
       const handleCanPlayThrough = () => {
-        console.log('🎬 Video can play through:', videoUrl);
+        console.log(`🎬 Can play through: ${recipe.title}`, videoUrl);
         if (isVisible && videoElement.paused) {
           videoElement.play().catch(e => {
-            console.log('⚠️ Play prevented:', e);
+            console.log(`⚠️ Play prevented for ${recipe.title}:`, e);
           });
         }
       };
       
-      // Remove old event listeners
+      // Remove old event listeners to prevent duplicates
       videoElement.onerror = null;
       videoElement.onloadedmetadata = null;
       videoElement.onloadeddata = null;
@@ -181,60 +180,126 @@ export const FullScreenRecipeCard: React.FC<FullScreenRecipeCardProps> = ({
       videoElement.oncanplay = handleCanPlay;
       videoElement.oncanplaythrough = handleCanPlayThrough;
       
-      // Set source and load
+      // Set source and load immediately - don't wait for visibility
       videoElement.src = videoUrl;
+      videoElement.preload = 'auto';
+      // Ensure playsInline and muted are set for better compatibility
+      videoElement.playsInline = true;
+      videoElement.muted = true;
+      // Load the video immediately
       videoElement.load();
+      console.log(`🔄 Video load() called for "${recipe.title}"`);
+      
+      // Start preloading immediately - this helps with smooth streaming
+      // The browser will buffer the video in the background
+    } else {
+      // Source is already set, just ensure it's loaded and buffering
+      if (videoElement.readyState === 0) {
+        videoElement.load();
+      }
+      // If video has metadata but is paused, ensure it can play smoothly when needed
+      if (videoElement.readyState >= 1 && videoElement.paused && isVisible) {
+        videoElement.play().catch(() => {});
+      }
     }
-  }, [videoUrls, hasVideo, recipe.title, isVisible]);
+  }, [videoUrls, hasVideo, recipe.title, isVisible]); // Added isVisible to trigger play if already loaded
 
-  // Play/pause video based on visibility
+  // Play/pause video based on visibility - ULTRA AGGRESSIVE for smooth streaming
   useEffect(() => {
     const videoElement = videoRef.current;
     if (!videoElement || !hasVideo) return;
 
     if (isVisible) {
-      // Video should play when visible
-      const attemptPlay = async () => {
+      // Video should play when visible - be very aggressive
+      const forcePlay = async () => {
         try {
-          // Wait a bit for video to be ready
-          if (videoElement.readyState >= 2) { // HAVE_CURRENT_DATA
-            if (videoElement.paused) {
+          // Ensure source is set
+          if (!videoElement.src && videoUrls[0]) {
+            videoElement.src = videoUrls[0];
+            videoElement.load();
+          }
+          
+          // CRITICAL: Don't reset currentTime when scrolling - this causes freezing!
+          // Only reset if this is the first time the video is being played
+          const isFirstPlay = videoElement.currentTime === 0 && videoElement.duration === 0;
+          
+          if (!isFirstPlay && videoElement.currentTime > 0) {
+            // Video was already playing - DON'T reset, continue from current position
+            // This enables smooth streaming without freezing
+          } else {
+            // First time playing - start from beginning
+            videoElement.currentTime = 0;
+          }
+          
+          // Set playback settings for optimal streaming
+          videoElement.playbackRate = 1.0;
+          videoElement.muted = true;
+          
+          // Try to play immediately - browser will buffer automatically
+          if (videoElement.paused) {
+            try {
               await videoElement.play();
-              console.log('▶️ Video playing:', recipe.title);
+              console.log(`▶️✅ Playing: ${recipe.title} (time: ${videoElement.currentTime.toFixed(1)}s, ready: ${videoElement.readyState})`);
+            } catch (playError: any) {
+              console.log(`⚠️ Initial play failed for ${recipe.title}:`, playError.name);
+              // Retry after a short delay
+              setTimeout(async () => {
+                if (isVisible && videoElement.paused) {
+                  try {
+                    await videoElement.play();
+                    console.log(`▶️✅ Playing (retry): ${recipe.title}`);
+                  } catch (e) {
+                    console.log(`⚠️ Retry failed for ${recipe.title}`);
+                  }
+                }
+              }, 150);
             }
           } else {
-            // Wait for video to be ready
-            const waitForReady = () => {
-              if (videoElement.readyState >= 2) {
-                if (videoElement.paused) {
-                  videoElement.play().then(() => {
-                    console.log('▶️ Video playing (after wait):', recipe.title);
-                  }).catch(e => {
-                    console.log('⚠️ Play failed:', e);
-                  });
-                }
-              } else {
-                setTimeout(waitForReady, 50);
-              }
-            };
-            waitForReady();
+            // Already playing - ensure smooth playback
+            console.log(`▶️ Continuing: ${recipe.title} (time: ${videoElement.currentTime.toFixed(1)}s)`);
+            videoElement.playbackRate = 1.0;
           }
         } catch (error) {
-          console.log('⚠️ Video play error (may need user interaction):', error);
+          console.log(`⚠️ Play error for ${recipe.title}:`, error);
         }
       };
       
-      // Try to play after a short delay
-      const timeoutId = setTimeout(attemptPlay, 150);
-      return () => clearTimeout(timeoutId);
+      // Try to play immediately - don't wait
+      forcePlay();
+      
+      // Also set up a retry mechanism
+      const retryTimeout = setTimeout(() => {
+        if (videoElement.paused) {
+          forcePlay();
+        }
+      }, 100);
+      
+      // Monitor for play events and ensure continuous playback
+      const ensurePlaying = () => {
+        if (isVisible && videoElement.paused && videoElement.readyState >= 2) {
+          videoElement.play().catch(() => {});
+        }
+      };
+      
+      videoElement.addEventListener('loadeddata', ensurePlaying);
+      videoElement.addEventListener('canplay', ensurePlaying);
+      videoElement.addEventListener('canplaythrough', ensurePlaying);
+      
+      return () => {
+        clearTimeout(retryTimeout);
+        videoElement.removeEventListener('loadeddata', ensurePlaying);
+        videoElement.removeEventListener('canplay', ensurePlaying);
+        videoElement.removeEventListener('canplaythrough', ensurePlaying);
+      };
     } else {
       // Pause video when not visible to save resources
+      // But don't reset currentTime - this allows smooth resume
       if (!videoElement.paused) {
         videoElement.pause();
-        console.log('⏸️ Video paused:', recipe.title);
+        console.log(`⏸️ Paused: ${recipe.title}`);
       }
     }
-  }, [isVisible, hasVideo, recipe.title]);
+  }, [isVisible, hasVideo, recipe.title, videoUrls]);
 
   // Voiceover audio effect - load audio IMMEDIATELY and preload
   useEffect(() => {
@@ -478,26 +543,86 @@ export const FullScreenRecipeCard: React.FC<FullScreenRecipeCardProps> = ({
     <div className="relative h-full w-full bg-black">
       {hasVideo ? (
         <>
-          <video
-            ref={videoRef}
+      <video
+        ref={videoRef}
             src={videoUrls[0]}
-            onEnded={handleVideoEnded}
-            muted
-            autoPlay
-            playsInline
-            loop
-            crossOrigin="anonymous"
-            className="w-full h-full object-cover"
+        onEnded={handleVideoEnded}
+        muted
+        autoPlay
+        playsInline
+        loop
+        className="w-full h-full object-cover"
             preload="auto"
+            style={{ 
+              width: '100%', 
+              height: '100%', 
+              objectFit: 'cover',
+              pointerEvents: 'none' // Prevent video from blocking scroll interactions
+            }}
             onError={(e) => {
-              console.error('Video element error:', e);
+              console.error(`❌ Video error for "${recipe.title}":`, e);
               console.error('Video URL:', videoUrls[0]);
+              console.error('Video error details:', videoRef.current?.error);
+            }}
+            onLoadStart={() => {
+              console.log(`📥 Load start: ${recipe.title}`, videoUrls[0]);
+            }}
+            onLoadedMetadata={() => {
+              console.log(`📹 Metadata: ${recipe.title}`, videoUrls[0]);
+              // Try to play immediately when metadata loads if visible
+              if (isVisible && videoRef.current && videoRef.current.paused) {
+                videoRef.current.play().catch(e => {
+                  console.log(`⚠️ Auto-play blocked (metadata): ${recipe.title}`, e);
+                });
+              }
             }}
             onLoadedData={() => {
-              console.log('Video loaded in element:', videoUrls[0]);
+              console.log(`✅ Data loaded: ${recipe.title}`, videoUrls[0]);
+              // Try to play when loaded if visible
+              if (isVisible && videoRef.current && videoRef.current.paused) {
+                videoRef.current.play().catch(e => {
+                  console.log(`⚠️ Auto-play blocked for ${recipe.title}:`, e);
+                });
+              }
             }}
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+            onCanPlay={() => {
+              console.log(`▶️ Can play: ${recipe.title}`, videoUrls[0]);
+              // Try to play when can play if visible
+              if (isVisible && videoRef.current && videoRef.current.paused) {
+                videoRef.current.play().catch(e => {
+                  console.log(`⚠️ Play prevented for ${recipe.title}:`, e);
+                });
+              }
+            }}
+            onCanPlayThrough={() => {
+              console.log(`🎬 Can play through: ${recipe.title}`, videoUrls[0]);
+              // Try to play if visible
+              if (isVisible && videoRef.current && videoRef.current.paused) {
+                videoRef.current.play().catch(e => {
+                  console.log(`⚠️ Play prevented for ${recipe.title}:`, e);
+                });
+              }
+            }}
+            onPlay={() => {
+              console.log(`🎬 Playing: ${recipe.title}`);
+            }}
+            onPause={() => {
+              console.log(`⏸️ Paused: ${recipe.title}`);
+            }}
+            onWaiting={() => {
+              console.log(`⏳ Buffering: ${recipe.title}`);
+            }}
+            onPlaying={() => {
+              console.log(`▶️ Actually playing: ${recipe.title}`);
+            }}
+            onStalled={() => {
+              console.warn(`⚠️ Video stalled: ${recipe.title}`);
+            }}
+            onSuspend={() => {
+              console.warn(`⚠️ Video suspended: ${recipe.title}`);
+            }}
+      />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
         </>
       ) : (
         <div className="w-full h-full bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-900">

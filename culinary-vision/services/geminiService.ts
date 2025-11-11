@@ -135,20 +135,31 @@ const generateRecipeStoryboard = async (recipe: Recipe, apiKey: string): Promise
   const prompt = `Generate a 10-second vertical video storyboard for this recipe: "${recipe.title}"
 
 Recipe details:
+- Title: ${recipe.title}
 - Time: ${recipe.time_minutes} minutes
 - Difficulty: ${recipe.difficulty}
-- Steps: ${recipe.steps.join('. ')}
+- Steps: ${recipe.steps.map((step, i) => `${i + 1}. ${step}`).join(' | ')}
+- Ingredients: ${recipe.missing_items && recipe.missing_items.length > 0 ? recipe.missing_items.join(', ') : 'Basic pantry items'}
 
-Create an engaging, specific voiceover that:
-1. Mentions the dish name "${recipe.title}" clearly
-2. Highlights the time (${recipe.time_minutes} minutes) and difficulty
-3. Describes 2-3 key steps from the recipe
-4. Uses a casual, energetic tone like TikTok/Instagram Reels
-5. Is exactly 8-12 seconds when spoken (aim for 25-35 words)
+Create an engaging, DETAILED voiceover script that:
+1. Clearly mentions the dish name "${recipe.title}" at the start
+2. States the time (${recipe.time_minutes} minutes) and difficulty (${recipe.difficulty})
+3. NARRATES THE ACTUAL COOKING STEPS from the recipe - mention at least 4-5 specific steps: ${recipe.steps.slice(0, 5).join(', ')}
+4. Uses a casual, energetic, tutorial-style tone like TikTok/Instagram Reels
+5. Is 35-50 words long (10-12 seconds when spoken)
+6. Reads like a cooking instructor walking through the recipe
+
+The voiceover_script MUST include:
+- The dish name: "${recipe.title}"
+- The time: ${recipe.time_minutes} minutes
+- At least 4-5 actual steps from: ${recipe.steps.join(', ')}
+- A natural flow that sounds like someone teaching the recipe
+
+Example format: "Hey! Let's make ${recipe.title}! This takes just ${recipe.time_minutes} minutes and it's super ${recipe.difficulty}. First, ${recipe.steps[0]?.toLowerCase()}. Then ${recipe.steps[1]?.toLowerCase()}. ${recipe.steps[2] ? `Next, ${recipe.steps[2].toLowerCase()}. ` : ''}${recipe.steps[3] ? `Add ${recipe.steps[3].toLowerCase()}. ` : ''}${recipe.steps[4] ? `Finally, ${recipe.steps[4].toLowerCase()}. ` : ''}That's it! Your ${recipe.title} is ready!"
 
 Provide:
-- "hook": "One-sentence attention grabber mentioning the dish name, fun, casual"
-- "voiceover_script": "Specific narration mentioning "${recipe.title}" by name, the ${recipe.time_minutes}-minute time, and key cooking steps. Should be 25-35 words, casual and energetic, perfect for a short cooking video."
+- "hook": "One-sentence attention grabber mentioning "${recipe.title}" by name, fun, casual"
+- "voiceover_script": "A detailed, natural narration that reads through the recipe steps. MUST mention "${recipe.title}", ${recipe.time_minutes} minutes, and describe at least 4-5 actual steps: ${recipe.steps.slice(0, 5).join(', ')}. Should be 35-50 words, spoken naturally like a cooking tutorial, not generic content."
 - "video_description": "Detailed description of the cooking video covering the key visual steps and actions that will happen in 10 seconds. Include transitions between steps."
 - "caption": "Main on-screen text/caption - the dish name "${recipe.title}" (keep it short and punchy)"
 

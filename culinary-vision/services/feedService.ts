@@ -39,6 +39,7 @@ const DEFAULT_VIDEOS = [
 ];
 
 // 10 Default recipes covering wide range of ingredients and meal types
+// Videos are matched to recipes by name
 const DEFAULT_RECIPES: Omit<FeedItem, 'id' | 'createdAt' | 'isLiked' | 'likes'>[] = [
   {
     recipe: {
@@ -60,59 +61,9 @@ const DEFAULT_RECIPES: Omit<FeedItem, 'id' | 'createdAt' | 'isLiked' | 'likes'>[
       video_description: "Close-up of toasting bread, mashing avocado, spreading on toast, and adding toppings",
       caption: "5-Min Avocado Toast"
     },
-    videoUrl: DEFAULT_VIDEOS[0],
+    videoUrl: '/vids/avacadotoast.mp4', // Matches avacadotoast.mp4
     tags: ["breakfast", "vegetarian", "healthy", "quick", "avocado", "bread"],
     mealType: "breakfast",
-    isDefault: true
-  },
-  {
-    recipe: {
-      title: "Mediterranean Quinoa Bowl",
-      time_minutes: 20,
-      difficulty: "easy",
-      steps: [
-        "Cook quinoa according to package",
-        "Dice cucumbers and tomatoes",
-        "Add feta cheese and olives",
-        "Drizzle with olive oil and lemon",
-        "Toss with fresh herbs"
-      ],
-      missing_items: []
-    },
-    storyboard: {
-      hook: "Fresh and healthy Mediterranean flavors!",
-      voiceover_script: "Colorful quinoa bowl with fresh vegetables and tangy feta. Light and satisfying.",
-      video_description: "Cooking quinoa, chopping vegetables, assembling bowl with vibrant ingredients",
-      caption: "Mediterranean Quinoa"
-    },
-    videoUrl: DEFAULT_VIDEOS[1],
-    tags: ["lunch", "vegetarian", "healthy", "mediterranean", "quinoa", "vegetables"],
-    mealType: "lunch",
-    isDefault: true
-  },
-  {
-    recipe: {
-      title: "Spicy Thai Basil Stir Fry",
-      time_minutes: 15,
-      difficulty: "easy",
-      steps: [
-        "Heat oil in a wok",
-        "Add garlic and chili",
-        "Stir fry vegetables quickly",
-        "Add soy sauce and basil",
-        "Serve over rice"
-      ],
-      missing_items: []
-    },
-    storyboard: {
-      hook: "Bursting with Thai flavors in minutes!",
-      voiceover_script: "Fiery stir fry with fresh basil and crisp vegetables. Fast and flavorful.",
-      video_description: "Sizzling wok with vegetables, adding sauce, tossing with basil leaves",
-      caption: "Thai Basil Stir Fry"
-    },
-    videoUrl: DEFAULT_VIDEOS[2],
-    tags: ["dinner", "asian", "spicy", "vegetables", "quick", "thai"],
-    mealType: "dinner",
     isDefault: true
   },
   {
@@ -135,109 +86,9 @@ const DEFAULT_RECIPES: Omit<FeedItem, 'id' | 'createdAt' | 'isLiked' | 'likes'>[
       video_description: "Blending fruits, pouring into bowl, adding colorful toppings",
       caption: "Berry Smoothie Bowl"
     },
-    videoUrl: DEFAULT_VIDEOS[3],
+    videoUrl: '/vids/berrymilksmoothie.mp4', // Matches berrymilksmoothie.mp4
     tags: ["breakfast", "healthy", "fruits", "smoothie", "quick", "berries"],
     mealType: "breakfast",
-    isDefault: true
-  },
-  {
-    recipe: {
-      title: "Herb-Crusted Salmon",
-      time_minutes: 25,
-      difficulty: "easy",
-      steps: [
-        "Preheat oven to 400°F",
-        "Mix herbs with breadcrumbs",
-        "Press onto salmon fillets",
-        "Bake until flaky",
-        "Serve with lemon wedges"
-      ],
-      missing_items: []
-    },
-    storyboard: {
-      hook: "Elegant salmon dinner made simple!",
-      voiceover_script: "Crispy herb crust on tender salmon. Restaurant quality at home.",
-      video_description: "Coating salmon with herbs, baking in oven, golden crust forming",
-      caption: "Herb-Crusted Salmon"
-    },
-    videoUrl: DEFAULT_VIDEOS[4],
-    tags: ["dinner", "seafood", "healthy", "herbs", "salmon", "elegant"],
-    mealType: "dinner",
-    isDefault: true
-  },
-  {
-    recipe: {
-      title: "Caprese Salad Skewers",
-      time_minutes: 10,
-      difficulty: "easy",
-      steps: [
-        "Thread cherry tomatoes on skewers",
-        "Add fresh mozzarella balls",
-        "Tuck in basil leaves",
-        "Drizzle with balsamic",
-        "Season with salt and pepper"
-      ],
-      missing_items: []
-    },
-    storyboard: {
-      hook: "Perfect party appetizer in minutes!",
-      voiceover_script: "Fresh caprese skewers with mozzarella, tomatoes, and basil. Simple elegance.",
-      video_description: "Threading ingredients onto skewers, arranging on platter, drizzling balsamic",
-      caption: "Caprese Skewers"
-    },
-    videoUrl: DEFAULT_VIDEOS[5],
-    tags: ["snack", "vegetarian", "italian", "appetizer", "tomatoes", "mozzarella"],
-    mealType: "snack",
-    isDefault: true
-  },
-  {
-    recipe: {
-      title: "Mexican Street Corn",
-      time_minutes: 15,
-      difficulty: "easy",
-      steps: [
-        "Grill corn until charred",
-        "Mix mayo with lime juice",
-        "Brush onto corn",
-        "Sprinkle with chili powder",
-        "Top with cilantro and cheese"
-      ],
-      missing_items: []
-    },
-    storyboard: {
-      hook: "Authentic Mexican street food at home!",
-      voiceover_script: "Smoky grilled corn with creamy sauce and spices. Irresistibly delicious.",
-      video_description: "Grilling corn, applying sauce, sprinkling spices, colorful toppings",
-      caption: "Mexican Street Corn"
-    },
-    videoUrl: DEFAULT_VIDEOS[6],
-    tags: ["snack", "mexican", "spicy", "grilled", "corn", "street-food"],
-    mealType: "snack",
-    isDefault: true
-  },
-  {
-    recipe: {
-      title: "Lemon Herb Chicken",
-      time_minutes: 30,
-      difficulty: "easy",
-      steps: [
-        "Marinate chicken in lemon and herbs",
-        "Heat pan over medium high",
-        "Cook chicken until golden",
-        "Add lemon slices to pan",
-        "Serve with roasted vegetables"
-      ],
-      missing_items: []
-    },
-    storyboard: {
-      hook: "Bright and zesty chicken dinner!",
-      voiceover_script: "Tender chicken with fresh lemon and aromatic herbs. Light and flavorful.",
-      video_description: "Marinating chicken, searing in pan, adding lemon, golden brown finish",
-      caption: "Lemon Herb Chicken"
-    },
-    videoUrl: DEFAULT_VIDEOS[7],
-    tags: ["dinner", "chicken", "herbs", "lemon", "healthy", "protein"],
-    mealType: "dinner",
     isDefault: true
   },
   {
@@ -260,9 +111,84 @@ const DEFAULT_RECIPES: Omit<FeedItem, 'id' | 'createdAt' | 'isLiked' | 'likes'>[
       video_description: "Mixing oats and milk, adding fruits, layering in jar, morning reveal",
       caption: "Overnight Oats"
     },
-    videoUrl: DEFAULT_VIDEOS[0],
+    videoUrl: '/vids/overnightoats.mp4', // Matches overnightoats.mp4
     tags: ["breakfast", "healthy", "meal-prep", "oats", "fruits", "make-ahead"],
     mealType: "breakfast",
+    isDefault: true
+  },
+  {
+    recipe: {
+      title: "Lemon Herb Chicken",
+      time_minutes: 30,
+      difficulty: "easy",
+      steps: [
+        "Marinate chicken in lemon and herbs",
+        "Heat pan over medium high",
+        "Cook chicken until golden",
+        "Add lemon slices to pan",
+        "Serve with roasted vegetables"
+      ],
+      missing_items: []
+    },
+    storyboard: {
+      hook: "Bright and zesty chicken dinner!",
+      voiceover_script: "Tender chicken with fresh lemon and aromatic herbs. Light and flavorful.",
+      video_description: "Marinating chicken, searing in pan, adding lemon, golden brown finish",
+      caption: "Lemon Herb Chicken"
+    },
+    videoUrl: '/vids/lemonchicken.mp4', // Matches lemonchicken.mp4
+    tags: ["dinner", "chicken", "herbs", "lemon", "healthy", "protein"],
+    mealType: "dinner",
+    isDefault: true
+  },
+  {
+    recipe: {
+      title: "Spicy Thai Basil Stir Fry",
+      time_minutes: 15,
+      difficulty: "easy",
+      steps: [
+        "Heat oil in a wok",
+        "Add garlic and chili",
+        "Stir fry vegetables quickly",
+        "Add soy sauce and basil",
+        "Serve over rice"
+      ],
+      missing_items: []
+    },
+    storyboard: {
+      hook: "Bursting with Thai flavors in minutes!",
+      voiceover_script: "Fiery stir fry with fresh basil and crisp vegetables. Fast and flavorful.",
+      video_description: "Sizzling wok with vegetables, adding sauce, tossing with basil leaves",
+      caption: "Thai Basil Stir Fry"
+    },
+    videoUrl: '/vids/thaibasilcurry.mp4', // Matches thaibasilcurry.mp4
+    tags: ["dinner", "asian", "spicy", "vegetables", "quick", "thai"],
+    mealType: "dinner",
+    isDefault: true
+  },
+  {
+    recipe: {
+      title: "Mexican Street Corn",
+      time_minutes: 15,
+      difficulty: "easy",
+      steps: [
+        "Grill corn until charred",
+        "Mix mayo with lime juice",
+        "Brush onto corn",
+        "Sprinkle with chili powder",
+        "Top with cilantro and cheese"
+      ],
+      missing_items: []
+    },
+    storyboard: {
+      hook: "Authentic Mexican street food at home!",
+      voiceover_script: "Smoky grilled corn with creamy sauce and spices. Irresistibly delicious.",
+      video_description: "Grilling corn, applying sauce, sprinkling spices, colorful toppings",
+      caption: "Mexican Street Corn"
+    },
+    videoUrl: '/vids/mexicancorn.mp4', // Matches mexicancorn.mp4
+    tags: ["snack", "mexican", "spicy", "grilled", "corn", "street-food"],
+    mealType: "snack",
     isDefault: true
   },
   {
@@ -285,8 +211,33 @@ const DEFAULT_RECIPES: Omit<FeedItem, 'id' | 'createdAt' | 'isLiked' | 'likes'>[
       video_description: "Sautéing spices, adding vegetables, pouring coconut milk, simmering curry",
       caption: "Vegetable Curry"
     },
-    videoUrl: DEFAULT_VIDEOS[1],
+    videoUrl: '/vids/vegetablecurry.mp4', // Matches vegetablecurry.mp4
     tags: ["dinner", "vegetarian", "curry", "spices", "coconut", "vegetables"],
+    mealType: "dinner",
+    isDefault: true
+  },
+  {
+    recipe: {
+      title: "Herb-Crusted Salmon",
+      time_minutes: 25,
+      difficulty: "easy",
+      steps: [
+        "Preheat oven to 400°F",
+        "Mix herbs with breadcrumbs",
+        "Press onto salmon fillets",
+        "Bake until flaky",
+        "Serve with lemon wedges"
+      ],
+      missing_items: []
+    },
+    storyboard: {
+      hook: "Elegant salmon dinner made simple!",
+      voiceover_script: "Crispy herb crust on tender salmon. Restaurant quality at home.",
+      video_description: "Coating salmon with herbs, baking in oven, golden crust forming",
+      caption: "Herb-Crusted Salmon"
+    },
+    videoUrl: '/vids/herbcrustedsalmon.mp4', // Matches herbcrustedsalmon.mp4
+    tags: ["dinner", "seafood", "healthy", "herbs", "salmon", "elegant"],
     mealType: "dinner",
     isDefault: true
   }
@@ -511,8 +462,9 @@ export const feedService = {
   },
 
   // Get personalized feed (mixes default and user recipes)
+  // Note: Only recipes with videos are included in DEFAULT_RECIPES
   getFeed(maxItems: number = 10): FeedItem[] {
-    // Check if cached feed has old Google video URLs - if so, clear cache
+    // Check if cached feed has old Google video URLs or mismatched videos - if so, clear cache
     const cached = this.getCachedFeed();
     if (cached && cached.length >= maxItems) {
       // Check if any default items are using old Google Cloud Storage URLs
@@ -522,7 +474,15 @@ export const feedService = {
         item.videoUrl.includes('storage.googleapis.com/gtv-videos-bucket')
       );
       
-      if (!hasOldVideos) {
+      // Check if videos don't match recipe titles (mismatch detection)
+      const hasMismatchedVideos = cached.some((item, index) => {
+        if (!item.isDefault || index >= DEFAULT_RECIPES.length) return false;
+        const expectedRecipe = DEFAULT_RECIPES[index];
+        const expectedVideoUrl = expectedRecipe.videoUrl;
+        return item.videoUrl !== expectedVideoUrl;
+      });
+      
+      if (!hasOldVideos && !hasMismatchedVideos) {
         // Cache is valid, just update liked status
         const likedIds = this.getLikedRecipeIds();
         return cached.map(item => ({
@@ -530,8 +490,8 @@ export const feedService = {
           isLiked: likedIds.has(item.id)
         }));
       } else {
-        // Cache has old videos, clear it and rebuild
-        console.log('Clearing feed cache - detected old video URLs');
+        // Cache has old videos or mismatched videos, clear it and rebuild
+        console.log('Clearing feed cache - detected old or mismatched video URLs');
         localStorage.removeItem(FEED_CACHE_KEY);
       }
     }
@@ -541,15 +501,24 @@ export const feedService = {
     const likedIds = this.getLikedRecipeIds();
     const feed: FeedItem[] = [];
 
-    // Initialize default recipes with new video URLs
-    const defaultItems: FeedItem[] = DEFAULT_RECIPES.map((recipe, index) => ({
-      ...recipe,
-      id: `default_${index}`,
-      createdAt: new Date(),
-      isLiked: likedIds.has(`default_${index}`),
-      likes: Math.floor(Math.random() * 100) + 10, // Random likes for defaults
-      videoUrl: recipe.videoUrl || DEFAULT_VIDEOS[index % DEFAULT_VIDEOS.length]
-    }));
+    // Initialize default recipes with CORRECT video URLs - use the videoUrl from DEFAULT_RECIPES
+    const defaultItems: FeedItem[] = DEFAULT_RECIPES.map((recipe, index) => {
+      // Ensure we use the videoUrl from the recipe definition, not a fallback
+      const videoUrl = recipe.videoUrl;
+      if (!videoUrl) {
+        console.warn(`Recipe "${recipe.recipe.title}" at index ${index} has no videoUrl`);
+      } else {
+        console.log(`✅ Mapping recipe "${recipe.recipe.title}" to video: ${videoUrl}`);
+      }
+      return {
+        ...recipe,
+        id: `default_${index}`,
+        createdAt: new Date(),
+        isLiked: likedIds.has(`default_${index}`),
+        likes: Math.floor(Math.random() * 100) + 10, // Random likes for defaults
+        videoUrl: videoUrl // Use the explicitly defined videoUrl from DEFAULT_RECIPES
+      };
+    });
 
     // If we have user recipes, replace dissimilar default ones
     if (userRecipes.length > 0) {
@@ -645,6 +614,12 @@ export const feedService = {
   clearFeedCache(): void {
     localStorage.removeItem(FEED_CACHE_KEY);
     console.log('Feed cache cleared');
+  },
+  
+  // Force refresh feed with correct video mappings (clears cache and rebuilds)
+  forceRefreshFeed(): void {
+    localStorage.removeItem(FEED_CACHE_KEY);
+    console.log('Feed cache cleared - feed will rebuild with correct video mappings on next getFeed() call');
   }
 };
 
